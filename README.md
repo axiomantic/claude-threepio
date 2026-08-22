@@ -145,7 +145,7 @@ alias claude-proxy='ANTHROPIC_BASE_URL="http://127.0.0.1:3010" ANTHROPIC_API_KEY
 
 ## Verifying Model Routing & Live Logs
 
-You can easily verify that your requests are being proxied without incurring Anthropic cloud charges:
+You can easily verify that your requests are being proxied correctly:
 
 1. **Live Proxy Stream**: Run the built-in log watcher in a terminal tab to see every intercepted request, target model routing, latency, and HTTP response code in real time:
    ```bash
