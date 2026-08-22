@@ -22,7 +22,7 @@ None of these are good. This project exists for option four:
 
 4. **Stay in Claude Code CLI or Claude Desktop. Route requests to cheaper models on OpenRouter** — at 80-95% lower cost. Your sessions, projects, sidebar, and workflow don't change. This tool maps each Claude tier (Opus, Sonnet, Haiku, etc.) to a recommended equivalent model automatically, or you can pick your own custom model for any tier.
 
-A typical day of coding that would cost $50-200+ in Claude overage costs $2-5 on OpenRouter with equivalent-quality models.
+A typical day of coding that would cost $50-200+ in Claude overage costs $0-5 on OpenRouter with equivalent-quality models. OpenRouter has many excellent free models and sometimes hosts [stealth frontier models](https://openrouter.ai/stealth/ox-alpha) for free for a limited time.
 
 ---
 
