@@ -2353,6 +2353,7 @@ strict_guardrail = StrictModelGuardrail()
         if canon in seen_canons:
             continue
         seen_canons.add(canon)
+        d = s["model_entry"]
         badge = format_slot_badge(s["tier"], s["slot_index"], canon)
         clean_name = clean_model_display_name(d.get("name", canon))
         dense_price = format_dense_price(d.get("price_str", ""))
