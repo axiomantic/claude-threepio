@@ -153,8 +153,19 @@ You can easily verify that your requests are being proxied without incurring Ant
    ```
    *Example output:*
    ```text
-   [PROXY ➔] Intercepted: 'claude-sonnet-4-5' ➔ Slot: 'claude-sonnet-4-5' [DeepSeek V4 Flash (deepseek/deepseek-v4-flash)]
-   [PROXY ✔] Completed 200 OK: 'claude-sonnet-4-5' [DeepSeek V4 Flash (deepseek/deepseek-v4-flash)]
+   ❯ ./claude-threepio logs
+
+   ============================================================
+     claude-threepio Live Proxy Stream (http://127.0.0.1:3010) (v1.21.0)
+   ============================================================
+   [INFO] Streaming live requests in real-time (Press Ctrl+C to stop)...
+
+   [14:05:40] [PROXY ✔] 200 OK ➔ Ox Alpha (8.31s) [Completed]
+   [14:05:41] [PROXY ➔] Intercepted: 'claude-opus-4'
+              ├─ Mapped Slot:     claude-opus-4 (Opus Tier)
+              ├─ Target Model:    Ox Alpha [stealth/ox-alpha]
+              ├─ Rates / Pricing: Stealth Free ($0.00/$0.00)
+              └─ Remote Endpoint: https://openrouter.ai (OpenRouter Cloud)
    ```
 
 2. **Ask Claude Directly**: Ask Claude in your session:
