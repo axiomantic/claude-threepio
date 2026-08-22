@@ -97,6 +97,7 @@ Check the active mode and proxy health at any time:
 ```bash
 ./claude-threepio install            # Full setup: venv, API key, model picker, daemon
 ./claude-threepio launch             # Launch Claude CLI routed through the local proxy
+./claude-threepio logs               # Live stream intercepted requests and model routing
 ./claude-threepio models             # Reconfigure tier models (live OpenRouter prices)
 ./claude-threepio switch [mode]      # Switch between 1P (regular) and 3P (proxy) mode
 ./claude-threepio sync-sessions      # Merge sessions and sidebar groupings between 1P and 3P
@@ -109,26 +110,59 @@ Check the active mode and proxy health at any time:
 
 ## Using with Claude CLI (Claude Code)
 
+> [!WARNING]
+> **Claude Code CLI Advisory & Environment Variables**:
+> 1. **Proxy Environment Variables Required**: Claude Code CLI (`claude`) **MUST** be launched with `ANTHROPIC_BASE_URL="http://127.0.0.1:3010"` and `ANTHROPIC_API_KEY="dummy-key"` (or via `./claude-threepio launch`). If launched without these variables, Claude Code CLI will bypass the local proxy entirely and route requests directly through Anthropic's cloud servers — consuming your regular Claude Max/Pro subscription quota or Anthropic API billing.
+> 2. **Model Names in CLI UI**: Even in proxy mode, the `/model` selector inside Claude Code CLI will display Anthropic's standard internal names (`Opus 5 (1M context)`, `Sonnet 5`, `Haiku 4.5`), **not** your custom model names:
+>    ```text
+>      1. Default (recommended) ✔  Use the default model (currently Opus 5 (1M context))
+>      2. Opus (1M context)        Opus 5 with 1M context · Best for complex tasks
+>      3. Fable                    Fable 5 · Longest-running agentic tasks
+>      4. Sonnet                   Sonnet 5 · Efficient for routine tasks
+>    ❯ 5. Haiku                    Haiku 4.5 · Fastest for quick answers
+>    ```
+>    `claude-threepio` intercepts each request transparently and routes it to the specific OpenRouter / local engine slot you assigned in `./claude-threepio models`.
+
 ### Recommended: use the built-in launcher
 
 ```bash
 ./claude-threepio launch
 ```
 
-This sets the correct env vars and `exec`s into `claude` — no need to remember export commands.
+This sets the required environment variables and `exec`s into `claude` — no need to remember export commands.
 
-### Manual launch
+### Manual launch or shell alias
 
 ```bash
+# Manual inline launch
 ANTHROPIC_BASE_URL="http://127.0.0.1:3010" ANTHROPIC_API_KEY="dummy-key" claude
-```
 
-Or add to your shell profile for a persistent alias:
-
-```bash
-# ~/.zshrc or ~/.bashrc
+# Or add persistent alias to ~/.zshrc or ~/.bashrc
 alias claude-proxy='ANTHROPIC_BASE_URL="http://127.0.0.1:3010" ANTHROPIC_API_KEY="dummy-key" claude'
 ```
+
+---
+
+## Verifying Model Routing & Live Logs
+
+You can easily verify that your requests are being proxied without incurring Anthropic cloud charges:
+
+1. **Live Proxy Stream**: Run the built-in log watcher in a terminal tab to see every intercepted request, target model routing, latency, and HTTP response code in real time:
+   ```bash
+   ./claude-threepio logs
+   ```
+   *Example output:*
+   ```text
+   [PROXY ➔] Intercepted: 'claude-sonnet-4-5' ➔ Slot: 'claude-sonnet-4-5' [DeepSeek V4 Flash (deepseek/deepseek-v4-flash)]
+   [PROXY ✔] Completed 200 OK: 'claude-sonnet-4-5' [DeepSeek V4 Flash (deepseek/deepseek-v4-flash)]
+   ```
+
+2. **Ask Claude Directly**: Ask Claude in your session:
+   > *"What model are you?"*
+   
+   The underlying model (DeepSeek, Qwen, Nemotron, GLM, etc.) will identify itself in its response.
+
+3. **Check Usage Dashboards**: You can check your [Claude Subscription Usage](https://claude.ai/new#settings/usage) or [Anthropic Console Usage](https://platform.claude.com/usage) to confirm that 0 tokens were billed to Anthropic.
 
 ---
 
