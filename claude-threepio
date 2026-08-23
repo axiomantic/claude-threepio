@@ -651,12 +651,19 @@ CURATED_DESCRIPTIONS = {
         "• Software Engineering Focus: Trained explicitly on developer workflows, unit tests, and commit histories.\n"
         "• Free Inference: Zero API cost via OpenRouter Community Collection."
     ),
-    "google/gemma-4-31b-it:free": (
-        "Google's open-weights 31B instruction-tuned model from the Free Collection. Demonstrates strong zero-shot performance, "
-        "code understanding, and 262k context window.\n\n"
-        "• 262k Context: Long-horizon reasoning for complex documents and code files.\n"
-        "• Google Research Lineage: Inherits architectural advancements from Gemini research.\n"
-        "• Free Community Option: Accessible high-quality open-weights model."
+    "nvidia/nemotron-3-super-120b-a12b:free": (
+        "NVIDIA's high-efficiency 120B MoE model from the Free Collection. Strong multi-turn coding logic, "
+        "syntactic precision, and 256k context window at $0.00 cost.\n\n"
+        "• 256k Context: Deep context capacity for multi-file code review and repository exploration.\n"
+        "• High Accuracy: Tuned on NVIDIA's reasoning and algorithmic datasets.\n"
+        "• Free Sonnet / Haiku Option: Highly responsive zero-cost daily driver."
+    ),
+    "nvidia/nemotron-nano-12b-v2-vl:free": (
+        "NVIDIA's efficient 12B multimodal/text reasoning model from the Free Collection. Fast response times, "
+        "125k context window, and lightweight memory footprint.\n\n"
+        "• 125k Context Window: Generous capacity for short tasks, utility commands, and context retrieval.\n"
+        "• Fast Execution: Instantaneous token generation for quick lookups and edits.\n"
+        "• Free Community Option: Zero API cost on OpenRouter."
     ),
     "qwen/qwen3.7-flash": (
         "Alibaba Cloud's ultra-budget workhorse at $0.03/$0.13 per 1M tokens. Features 1M context window, lightning-fast "
@@ -1987,7 +1994,7 @@ def run_model_configuration(initial_step=0):
                 get_model_entry(catalog, "deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "$0.08/$0.15", "1M Context", True, is_recommended=True),
                 get_model_entry(catalog, "cohere/north-mini-code:free", "North Mini Code (Free)", "$0.00/$0.00", "256k Context", False),
                 get_model_entry(catalog, "poolside/laguna-s-2.1:free", "Laguna S 2.1 (Free)", "$0.00/$0.00", "262k Context", False),
-                get_model_entry(catalog, "google/gemma-4-31b-it:free", "Gemma 4 31B (Free)", "$0.00/$0.00", "262k Context", False),
+                get_model_entry(catalog, "nvidia/nemotron-3-super-120b-a12b:free", "Nemotron 3 Super 120B (Free)", "$0.00/$0.00", "256k Context", False),
                 get_model_entry(catalog, "qwen/qwen3.7-flash", "Qwen 3.7 Flash", "$0.03/$0.13", "1M Context", True),
                 get_model_entry(catalog, "deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", "$0.50/$1.00", "1M Context", True),
                 get_model_entry(catalog, "google/gemini-2.0-flash-001", "Gemini 2.0 Flash", "$0.10/$0.40", "1M Context", True),
@@ -2011,7 +2018,7 @@ def run_model_configuration(initial_step=0):
                 get_model_entry(catalog, "qwen/qwen3.7-flash", "Qwen 3.7 Flash", "$0.03/$0.13", "1M Context", True, is_recommended=True),
                 get_model_entry(catalog, "nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning (Free)", "$0.00/$0.00", "1M Context", True),
                 get_model_entry(catalog, "nvidia/nemotron-3-nano-30b-a3b:free", "Nemotron 3 Nano 30B (Free)", "$0.00/$0.00", "256k Context", False),
-                get_model_entry(catalog, "thinkingmachines/inkling-small:free", "Inkling Small (Free)", "$0.00/$0.00", "262k Context", False),
+                get_model_entry(catalog, "nvidia/nemotron-nano-12b-v2-vl:free", "Nemotron Nano 12B VL (Free)", "$0.00/$0.00", "125k Context", False),
                 get_model_entry(catalog, "deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "$0.08/$0.15", "1M Context", True),
                 get_model_entry(catalog, "inclusionai/ling-3.0-flash", "Ling 3.0 Flash", "$0.02/$0.06", "262k Context", False),
                 get_model_entry(catalog, "openai/gpt-oss-120b", "GPT-OSS 120B", "$0.03/$0.17", "131k Context", False),
@@ -2204,15 +2211,22 @@ class StrictModelGuardrail(CustomLogger):
                 pass
         print(f"[{{t_now}}] [PROXY ✔] 200 OK ➔ {{m_name}}{{elapsed}} [Completed]", flush=True)
 
-    async def async_post_call_failure_hook(self, request_data, user_api_key_dict, response, **kwargs):
-        req_model = request_data.get("model", "unknown") if isinstance(request_data, dict) else "unknown"
+    async def async_post_call_failure_hook(self, request_data=None, user_api_key_dict=None, response=None, *args, **kwargs):
+        req_model = "unknown"
+        if isinstance(request_data, dict):
+            req_model = request_data.get("model", "unknown")
+        elif isinstance(response, dict):
+            req_model = response.get("model", "unknown")
         info = TARGET_DISPLAY_MAP.get(req_model, {{}})
         m_name = info.get("name", req_model)
         t_now = datetime.now().strftime("%H:%M:%S")
-        print(f"[{{t_now}}] [PROXY ✖] Request Failed: '{{m_name}}' ➔ Error: {{response}}", flush=True)
+        err_msg = str(response) if response is not None else (kwargs.get("original_exception") or "Upstream Error")
+        print(f"[{{t_now}}] [PROXY ✖] Request Failed: '{{m_name}}' ➔ Error: {{err_msg}}", flush=True)
 
-    async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
-        req_model = kwargs.get("model", "unknown")
+    async def async_log_failure_event(self, kwargs=None, response_obj=None, start_time=None, end_time=None, *args, **extra):
+        req_model = "unknown"
+        if isinstance(kwargs, dict):
+            req_model = kwargs.get("model", "unknown")
         info = TARGET_DISPLAY_MAP.get(req_model, {{}})
         m_name = info.get("name", req_model)
         t_now = datetime.now().strftime("%H:%M:%S")
@@ -2273,8 +2287,6 @@ strict_guardrail = StrictModelGuardrail()
             # Also register [1m] and -1m variants
             yaml_lines.append(f"  - model_name: {alias}[1m]")
             yaml_lines.append(f"    litellm_params:")
-            write_litellm_params(yaml_lines, d)
-            yaml_lines.append("")
             yaml_lines.append(f"  - model_name: {alias}-1m")
             yaml_lines.append(f"    litellm_params:")
             write_litellm_params(yaml_lines, d)
@@ -2282,9 +2294,16 @@ strict_guardrail = StrictModelGuardrail()
 
     yaml_lines.append("litellm_settings:")
     yaml_lines.append("  drop_params: true")
+    yaml_lines.append("  request_timeout: 300")
+    yaml_lines.append("  stream_timeout: 300")
+    yaml_lines.append("  num_retries: 2")
+    yaml_lines.append("  retry_after: 1")
     yaml_lines.append("  callbacks:")
     yaml_lines.append("    - guardrail.strict_guardrail\n")
     yaml_lines.append("router_settings:")
+    yaml_lines.append("  timeout: 300")
+    yaml_lines.append("  num_retries: 2")
+    yaml_lines.append("  retry_after: 1")
     yaml_lines.append("  disable_cooldowns: true")
     yaml_lines.append("  allowed_fails: 100000\n")
     yaml_lines.append("general_settings:")
@@ -2566,15 +2585,22 @@ class StrictModelGuardrail(CustomLogger):
                 pass
         print(f"[{{t_now}}] [PROXY ✔] 200 OK ➔ {{m_name}}{{elapsed}} [Completed]", flush=True)
 
-    async def async_post_call_failure_hook(self, request_data, user_api_key_dict, response, **kwargs):
-        req_model = request_data.get("model", "unknown") if isinstance(request_data, dict) else "unknown"
+    async def async_post_call_failure_hook(self, request_data=None, user_api_key_dict=None, response=None, *args, **kwargs):
+        req_model = "unknown"
+        if isinstance(request_data, dict):
+            req_model = request_data.get("model", "unknown")
+        elif isinstance(response, dict):
+            req_model = response.get("model", "unknown")
         info = TARGET_DISPLAY_MAP.get(req_model, {{}})
         m_name = info.get("name", req_model)
         t_now = datetime.now().strftime("%H:%M:%S")
-        print(f"[{{t_now}}] [PROXY ✖] Request Failed: '{{m_name}}' ➔ Error: {{response}}", flush=True)
+        err_msg = str(response) if response is not None else (kwargs.get("original_exception") or "Upstream Error")
+        print(f"[{{t_now}}] [PROXY ✖] Request Failed: '{{m_name}}' ➔ Error: {{err_msg}}", flush=True)
 
-    async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
-        req_model = kwargs.get("model", "unknown")
+    async def async_log_failure_event(self, kwargs=None, response_obj=None, start_time=None, end_time=None, *args, **extra):
+        req_model = "unknown"
+        if isinstance(kwargs, dict):
+            req_model = kwargs.get("model", "unknown")
         info = TARGET_DISPLAY_MAP.get(req_model, {{}})
         m_name = info.get("name", req_model)
         t_now = datetime.now().strftime("%H:%M:%S")
