@@ -2492,31 +2492,61 @@ def regenerate_guardrail_from_config():
     allowed_models = set()
     target_display_map = {}
 
+    FRIENDLY_NAMES = {
+        "stealth/ox-alpha": ("Ox Alpha", "Stealth Free ($0.00)"),
+        "nvidia/nemotron-3-ultra-550b-a55b:free": ("Nemotron 3 Ultra 550B", "Free ($0.00)"),
+        "nvidia/nemotron-3-super-120b-a12b:free": ("Nemotron 3 Super 120B", "Free ($0.00)"),
+        "nvidia/nemotron-3.5-lightning:free": ("Nemotron 3.5 Lightning", "Free ($0.00)"),
+        "nvidia/nemotron-3-nano-30b-a3b:free": ("Nemotron 3 Nano 30B", "Free ($0.00)"),
+        "nvidia/nemotron-nano-12b-v2-vl:free": ("Nemotron Nano 12B VL", "Free ($0.00)"),
+        "cohere/north-mini-code:free": ("North Mini Code", "Free ($0.00)"),
+        "poolside/laguna-s-2.1:free": ("Laguna S 2.1", "Free ($0.00)"),
+        "deepseek/deepseek-v4-pro": ("DeepSeek V4 Pro", "$0.50/$1.00"),
+        "deepseek/deepseek-v4-flash": ("DeepSeek V4 Flash", "$0.08/$0.15"),
+        "qwen/qwen3.7-flash": ("Qwen 3.7 Flash", "$0.03/$0.13"),
+        "qwen/qwen3.7-plus": ("Qwen 3.7 Plus", "$0.32/$1.28"),
+    }
+
+    def get_tier_name(canon):
+        if "opus" in canon: return "Opus"
+        elif "sonnet" in canon: return "Sonnet"
+        elif "haiku" in canon or "instant" in canon: return "Haiku"
+        elif "fable" in canon: return "Fable"
+        elif "mythos" in canon: return "Mythos"
+        return "Custom"
+
     try:
         with open(config_yaml_path, "r", encoding="utf-8") as f:
-            current_canon = None
-            for line in f:
-                m = re.search(r"Slot \d+: (claude-[^\s]+) \((.*?)\) ➔ (.*?) \((.*?)\)", line)
-                if m:
-                    current_canon = m.group(1)
-                    slot_lbl = m.group(2)
-                    name = m.group(3)
-                    price = m.group(4)
-                    target_display_map[current_canon] = {
-                        "canonical": current_canon,
-                        "tier": current_canon.split("-")[1].capitalize() if "-" in current_canon else current_canon,
-                        "slot_label": slot_lbl,
-                        "name": clean_model_display_name(name),
-                        "model_id": name,
+            content = f.read()
+            # Simple line parsing to avoid yaml dependency if needed
+            current_model_name = None
+            for line in content.splitlines():
+                line = line.strip()
+                if line.startswith("- model_name:"):
+                    current_model_name = line.split(":", 1)[1].strip()
+                    allowed_models.add(current_model_name)
+                    base_name = re.sub(r"\[.*?\]$", "", current_model_name).replace("-1m", "")
+                    alias_map[current_model_name] = base_name
+                elif line.startswith("model:") and current_model_name:
+                    target = line.split(":", 1)[1].strip()
+                    raw_target = target.replace("openrouter/", "").replace("ollama/", "")
+                    friendly, price = FRIENDLY_NAMES.get(raw_target, (raw_target, "Configured Rate"))
+                    dest = "http://localhost:11434 (Local Ollama Engine)" if "ollama" in target else "https://openrouter.ai (OpenRouter Cloud)"
+                    base_name = alias_map.get(current_model_name, current_model_name)
+                    tier_lbl = get_tier_name(base_name)
+                    
+                    info_dict = {
+                        "canonical": base_name,
+                        "tier": tier_lbl,
+                        "name": f"{friendly} [{raw_target}]",
+                        "model_id": raw_target,
                         "price": price,
-                        "dest": "https://openrouter.ai (OpenRouter Cloud)" if "ollama" not in price.lower() else "http://localhost:11434 (Local Ollama Engine)"
+                        "dest": dest
                     }
-                m_model = re.search(r"- model_name:\s*(.+)", line)
-                if m_model:
-                    model_name = m_model.group(1).strip()
-                    allowed_models.add(model_name)
-                    if current_canon:
-                        alias_map[model_name] = current_canon
+                    target_display_map[base_name] = info_dict
+                    target_display_map[current_model_name] = info_dict
+                    target_display_map[raw_target] = info_dict
+                    target_display_map[target] = info_dict
     except Exception:
         return
 
