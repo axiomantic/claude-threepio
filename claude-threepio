@@ -2233,6 +2233,20 @@ class StrictModelGuardrail(CustomLogger):
         print(f"[{{t_now}}] [PROXY ✖] Request Failed: '{{m_name}}' ➔ {{response_obj}}", flush=True)
 
 strict_guardrail = StrictModelGuardrail()
+
+try:
+    from litellm.proxy.proxy_server import app
+    from fastapi.responses import JSONResponse
+
+    @app.api_route("/api/hello", methods=["GET", "HEAD", "OPTIONS"])
+    async def _api_hello_probe():
+        return JSONResponse(content={{"status": "ok", "gateway": "claude-threepio"}}, status_code=200)
+
+    @app.api_route("/api/version", methods=["GET", "HEAD", "OPTIONS"])
+    async def _api_version_probe():
+        return JSONResponse(content={{"version": "1.21.0"}}, status_code=200)
+except Exception:
+    pass
 """
     with open(guardrail_py_path, "w", encoding="utf-8") as f:
         f.write(guardrail_code)
@@ -2637,6 +2651,20 @@ class StrictModelGuardrail(CustomLogger):
         print(f"[{{t_now}}] [PROXY ✖] Request Failed: '{{m_name}}' ➔ {{response_obj}}", flush=True)
 
 strict_guardrail = StrictModelGuardrail()
+
+try:
+    from litellm.proxy.proxy_server import app
+    from fastapi.responses import JSONResponse
+
+    @app.api_route("/api/hello", methods=["GET", "HEAD", "OPTIONS"])
+    async def _api_hello_probe():
+        return JSONResponse(content={{"status": "ok", "gateway": "claude-threepio"}}, status_code=200)
+
+    @app.api_route("/api/version", methods=["GET", "HEAD", "OPTIONS"])
+    async def _api_version_probe():
+        return JSONResponse(content={{"version": "1.21.0"}}, status_code=200)
+except Exception:
+    pass
 """
     try:
         with open(guardrail_py_path, "w", encoding="utf-8") as f:
