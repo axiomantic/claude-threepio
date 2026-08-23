@@ -2307,6 +2307,8 @@ except Exception:
             # Also register [1m] and -1m variants
             yaml_lines.append(f"  - model_name: {alias}[1m]")
             yaml_lines.append(f"    litellm_params:")
+            write_litellm_params(yaml_lines, d)
+            yaml_lines.append("")
             yaml_lines.append(f"  - model_name: {alias}-1m")
             yaml_lines.append(f"    litellm_params:")
             write_litellm_params(yaml_lines, d)
