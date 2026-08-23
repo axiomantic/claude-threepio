@@ -2238,9 +2238,15 @@ try:
     from litellm.proxy.proxy_server import app
     from fastapi.responses import JSONResponse
 
-    @app.api_route("/api/hello", methods=["GET", "HEAD", "OPTIONS"])
+    @app.api_route("/api/hello", methods=["GET", "HEAD", "OPTIONS", "POST"])
     async def _api_hello_probe():
         return JSONResponse(content={{"status": "ok", "gateway": "claude-threepio"}}, status_code=200)
+
+    @app.api_route("/health", methods=["GET", "HEAD", "OPTIONS"])
+    @app.api_route("/health/liveliness", methods=["GET", "HEAD", "OPTIONS"])
+    @app.api_route("/health/readiness", methods=["GET", "HEAD", "OPTIONS"])
+    async def _health_probe():
+        return JSONResponse(content={{"status": "healthy"}}, status_code=200)
 
     @app.api_route("/api/version", methods=["GET", "HEAD", "OPTIONS"])
     async def _api_version_probe():
@@ -2656,9 +2662,15 @@ try:
     from litellm.proxy.proxy_server import app
     from fastapi.responses import JSONResponse
 
-    @app.api_route("/api/hello", methods=["GET", "HEAD", "OPTIONS"])
+    @app.api_route("/api/hello", methods=["GET", "HEAD", "OPTIONS", "POST"])
     async def _api_hello_probe():
         return JSONResponse(content={{"status": "ok", "gateway": "claude-threepio"}}, status_code=200)
+
+    @app.api_route("/health", methods=["GET", "HEAD", "OPTIONS"])
+    @app.api_route("/health/liveliness", methods=["GET", "HEAD", "OPTIONS"])
+    @app.api_route("/health/readiness", methods=["GET", "HEAD", "OPTIONS"])
+    async def _health_probe():
+        return JSONResponse(content={{"status": "healthy"}}, status_code=200)
 
     @app.api_route("/api/version", methods=["GET", "HEAD", "OPTIONS"])
     async def _api_version_probe():
