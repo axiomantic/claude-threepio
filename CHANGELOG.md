@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.22.0 (2026-08-24)
+
+### Fixed
+
+* **Two-way session and grouping sync across 1P/3P modes:**
+  * Remap `dframe-group-scopes` account UUIDs when translating between 1P and 3P profiles so group assignments are visible across mode switches.
+  * Merge and deduplicate `order` dictionary arrays for each group so Claude Desktop renders sessions inside groups rather than falling back to "Ungrouped".
+  * Replicate session `.json` files across all target workspaces (including default `00000000...` and active worktree workspaces).
+* **Thinking block context sanitization:**
+  * Pre-call guardrail hook automatically strips empty or whitespace-only `thinking` blocks from the messages array to prevent upstream `400: each thinking block must contain non-whitespace thinking` validation errors when switching between reasoning and non-reasoning models.
+
 ## 1.14.0 (2026-08-21)
 
 ### Changed

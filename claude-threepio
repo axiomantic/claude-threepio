@@ -90,7 +90,7 @@ import urllib.request
 from datetime import datetime
 
 # Script & Daemon Metadata
-VERSION = "1.21.0"
+VERSION = "1.22.0"
 MODELS_LAST_REVISITED = "2026-08-21"
 PORT = 3010
 PLIST_LABEL = "com.claude-threepio"
@@ -264,7 +264,7 @@ def validate_openrouter_key(api_key):
         "https://openrouter.ai/api/v1/auth/key",
         headers={
             "Authorization": f"Bearer {api_key}",
-            "User-Agent": "claude-threepio/1.21.0"
+            "User-Agent": "claude-threepio/1.22.0"
         }
     )
     try:
@@ -493,7 +493,7 @@ def fetch_openrouter_catalog():
     info("Fetching live model catalog & pricing from OpenRouter API...")
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/models",
-        headers={"User-Agent": "claude-threepio/1.21.0"}
+        headers={"User-Agent": "claude-threepio/1.22.0"}
     )
     catalog = {}
     try:
@@ -2250,7 +2250,7 @@ try:
 
     @app.api_route("/api/version", methods=["GET", "HEAD", "OPTIONS"])
     async def _api_version_probe():
-        return JSONResponse(content={{"version": "1.21.0"}}, status_code=200)
+        return JSONResponse(content={{"version": "1.22.0"}}, status_code=200)
 except Exception:
     pass
 """
@@ -2614,6 +2614,25 @@ class StrictModelGuardrail(CustomLogger):
                 print(f"           ├─ Rates / Pricing: {{m_price}}", flush=True)
             print(f"           └─ Remote Endpoint: {{m_dest}}", flush=True)
             data["model"] = canonical
+
+        # Sanitize message payload: remove empty/whitespace-only thinking blocks
+        messages = data.get("messages")
+        if isinstance(messages, list):
+            cleaned_messages = []
+            for msg in messages:
+                if isinstance(msg, dict) and "content" in msg and isinstance(msg["content"], list):
+                    cleaned_content = []
+                    for block in msg["content"]:
+                        if isinstance(block, dict) and block.get("type") == "thinking":
+                            tval = block.get("thinking", "")
+                            if not tval or not str(tval).strip():
+                                continue  # Drop empty thinking block to prevent 400 validation error
+                        cleaned_content.append(block)
+                    msg = dict(msg)
+                    msg["content"] = cleaned_content
+                cleaned_messages.append(msg)
+            data["messages"] = cleaned_messages
+
         return data
 
     async def async_post_call_success_hook(self, data, user_api_key_dict, response, **kwargs):
@@ -2676,7 +2695,7 @@ try:
 
     @app.api_route("/api/version", methods=["GET", "HEAD", "OPTIONS"])
     async def _api_version_probe():
-        return JSONResponse(content={{"version": "1.21.0"}}, status_code=200)
+        return JSONResponse(content={{"version": "1.22.0"}}, status_code=200)
 except Exception:
     pass
 """
@@ -2831,7 +2850,7 @@ def _detect_account_uuid(config_path):
 def _scan_session_dir(sessions_root, account_uuid):
     """Scan a claude-code-sessions directory for session JSON files.
 
-    Returns {sessionId: {"path": path, "lastActivityAt": int, "data": dict}}.
+    Returns {sessionId: {"path": path, "lastActivityAt": int, "data": dict, "workspaces": set}}.
     """
     sessions = {}
     if not account_uuid:
@@ -2854,12 +2873,15 @@ def _scan_session_dir(sessions_root, account_uuid):
                 if not sid:
                     continue
                 last_activity = data.get("lastActivityAt", 0)
-                sessions[sid] = {
-                    "path": fpath,
-                    "lastActivityAt": last_activity,
-                    "data": data,
-                    "workspace": workspace,
-                }
+                if sid not in sessions or last_activity > sessions[sid]["lastActivityAt"]:
+                    sessions[sid] = {
+                        "path": fpath,
+                        "lastActivityAt": last_activity,
+                        "data": data,
+                        "workspaces": {workspace},
+                    }
+                else:
+                    sessions[sid]["workspaces"].add(workspace)
             except Exception:
                 pass
     return sessions
@@ -2931,12 +2953,31 @@ def sync_sessions():
     groups_1p = _read_group_scopes(cfg_1p)
     groups_3p = _read_group_scopes(cfg_3p)
 
+    def _translate_scopes(scopes, src_acct, dst_acct):
+        """Return a copy of scopes with src_acct replaced by dst_acct in each key."""
+        result = {}
+        for k, v in scopes.items():
+            if src_acct and dst_acct and k.startswith(src_acct + "/"):
+                result[dst_acct + "/" + k[len(src_acct) + 1:]] = v
+            else:
+                result[k] = v
+        return result
+
+    # Translate remote account UUIDs before computing assignment deltas
+    scopes_3p_as_1p = _translate_scopes(groups_3p["dframe-group-scopes"], acct_3p, acct_1p)
+    scopes_1p_as_3p = _translate_scopes(groups_1p["dframe-group-scopes"], acct_1p, acct_3p)
+    scopes_1p_raw   = groups_1p["dframe-group-scopes"]
+    scopes_3p_raw   = groups_3p["dframe-group-scopes"]
+
     new_assignments_1p = 0
     new_assignments_3p = 0
-    for scope_key in set(groups_1p["dframe-group-scopes"].keys()) | set(groups_3p["dframe-group-scopes"].keys()):
-        a1 = groups_1p["dframe-group-scopes"].get(scope_key, {}).get("assignments", {})
-        a3 = groups_3p["dframe-group-scopes"].get(scope_key, {}).get("assignments", {})
+    for scope_key in set(scopes_1p_raw.keys()) | set(scopes_3p_as_1p.keys()):
+        a1 = scopes_1p_raw.get(scope_key, {}).get("assignments", {})
+        a3 = scopes_3p_as_1p.get(scope_key, {}).get("assignments", {})
         new_assignments_1p += len(set(a3.keys()) - set(a1.keys()))
+    for scope_key in set(scopes_3p_raw.keys()) | set(scopes_1p_as_3p.keys()):
+        a3 = scopes_3p_raw.get(scope_key, {}).get("assignments", {})
+        a1 = scopes_1p_as_3p.get(scope_key, {}).get("assignments", {})
         new_assignments_3p += len(set(a1.keys()) - set(a3.keys()))
 
     new_starred_1p = len(groups_3p["starred-local-code-sessions"] - groups_1p["starred-local-code-sessions"])
@@ -2970,35 +3011,49 @@ def sync_sessions():
         os.makedirs(d, exist_ok=True)
         return d
 
+    def _get_target_workspaces(sessions_root, account_uuid, src_workspaces):
+        """Get all workspace IDs for the target account, falling back to src_workspaces or default."""
+        acct_dir = os.path.join(sessions_root, account_uuid)
+        workspaces = set(src_workspaces)
+        if os.path.isdir(acct_dir):
+            for item in os.listdir(acct_dir):
+                if os.path.isdir(os.path.join(acct_dir, item)):
+                    workspaces.add(item)
+        if not workspaces:
+            workspaces.add("00000000-0000-4000-8000-000000000001")
+        return workspaces
+
     # Copy 1P-only → 3P
     for sid in only_1p:
         src = sessions_1p[sid]
-        target_dir = _ensure_target_dir(sessions_3p_root, acct_3p, src["workspace"])
-        target_path = os.path.join(target_dir, os.path.basename(src["path"]))
-        shutil.copy2(src["path"], target_path)
+        for ws in _get_target_workspaces(sessions_3p_root, acct_3p, src["workspaces"]):
+            target_dir = _ensure_target_dir(sessions_3p_root, acct_3p, ws)
+            shutil.copy2(src["path"], os.path.join(target_dir, os.path.basename(src["path"])))
 
     # Copy 3P-only → 1P
     for sid in only_3p:
         src = sessions_3p[sid]
-        target_dir = _ensure_target_dir(sessions_1p_root, acct_1p, src["workspace"])
-        target_path = os.path.join(target_dir, os.path.basename(src["path"]))
-        shutil.copy2(src["path"], target_path)
+        for ws in _get_target_workspaces(sessions_1p_root, acct_1p, src["workspaces"]):
+            target_dir = _ensure_target_dir(sessions_1p_root, acct_1p, ws)
+            shutil.copy2(src["path"], os.path.join(target_dir, os.path.basename(src["path"])))
 
     # Update conflicting sessions (newer wins)
     for sid, direction in updated:
         if direction == "1p→3p":
             src = sessions_1p[sid]
-            target_dir = _ensure_target_dir(sessions_3p_root, acct_3p, src["workspace"])
-            shutil.copy2(src["path"], os.path.join(target_dir, os.path.basename(src["path"])))
+            for ws in _get_target_workspaces(sessions_3p_root, acct_3p, src["workspaces"]):
+                target_dir = _ensure_target_dir(sessions_3p_root, acct_3p, ws)
+                shutil.copy2(src["path"], os.path.join(target_dir, os.path.basename(src["path"])))
         else:
             src = sessions_3p[sid]
-            target_dir = _ensure_target_dir(sessions_1p_root, acct_1p, src["workspace"])
-            shutil.copy2(src["path"], os.path.join(target_dir, os.path.basename(src["path"])))
+            for ws in _get_target_workspaces(sessions_1p_root, acct_1p, src["workspaces"]):
+                target_dir = _ensure_target_dir(sessions_1p_root, acct_1p, ws)
+                shutil.copy2(src["path"], os.path.join(target_dir, os.path.basename(src["path"])))
 
     # ── Execute: merge group assignments ─────────────────────────────────────
-    for config_path, groups_local, groups_remote, acct_local in [
-        (cfg_1p, groups_1p, groups_3p, acct_1p),
-        (cfg_3p, groups_3p, groups_1p, acct_3p),
+    for config_path, groups_local, groups_remote, acct_local, acct_remote in [
+        (cfg_1p, groups_1p, groups_3p, acct_1p, acct_3p),
+        (cfg_3p, groups_3p, groups_1p, acct_3p, acct_1p),
     ]:
         try:
             with open(config_path, "r", encoding="utf-8") as f:
@@ -3006,10 +3061,23 @@ def sync_sessions():
             epi = cfg.setdefault("preferences", {}).setdefault("epitaxyPrefs", {})
 
             # Merge dframe-group-scopes
+            # Scope keys are "{account_uuid}/{workspace_uuid}". When importing from the
+            # remote side, translate the remote account UUID → local account UUID so that
+            # the group assignments are visible after switching modes.
             local_scopes = epi.get("dframe-group-scopes", {})
-            for scope_key in set(local_scopes.keys()) | set(groups_remote["dframe-group-scopes"].keys()):
-                local_scope = local_scopes.get(scope_key, {"groups": [], "assignments": {}})
-                remote_scope = groups_remote["dframe-group-scopes"].get(scope_key, {"groups": [], "assignments": {}})
+
+            # Build a translated view of the remote scopes with account UUID remapped
+            remote_scopes_translated = {}
+            for rkey, rscope in groups_remote["dframe-group-scopes"].items():
+                if acct_remote and acct_local and rkey.startswith(acct_remote + "/"):
+                    tkey = acct_local + "/" + rkey[len(acct_remote) + 1:]
+                else:
+                    tkey = rkey
+                remote_scopes_translated[tkey] = rscope
+
+            for scope_key in set(local_scopes.keys()) | set(remote_scopes_translated.keys()):
+                local_scope = local_scopes.get(scope_key, {"groups": [], "assignments": {}, "order": {}})
+                remote_scope = remote_scopes_translated.get(scope_key, {"groups": [], "assignments": {}, "order": {}})
                 # Union groups (dedupe by group id)
                 local_groups = local_scope.get("groups", [])
                 remote_groups = remote_scope.get("groups", [])
@@ -3019,8 +3087,21 @@ def sync_sessions():
                         local_groups.append(g)
                         seen_ids.add(g.get("id"))
                 local_scope["groups"] = local_groups
+
                 # Union assignments
                 local_scope.setdefault("assignments", {}).update(remote_scope.get("assignments", {}))
+
+                # Union order arrays preserving order and deduplicating
+                local_order = local_scope.setdefault("order", {})
+                remote_order = remote_scope.get("order", {})
+                for grp_id, r_order_list in remote_order.items():
+                    l_order_list = local_order.setdefault(grp_id, [])
+                    seen_sids = set(l_order_list)
+                    for sid in r_order_list:
+                        if sid not in seen_sids:
+                            l_order_list.append(sid)
+                            seen_sids.add(sid)
+
                 local_scopes[scope_key] = local_scope
             epi["dframe-group-scopes"] = local_scopes
 
