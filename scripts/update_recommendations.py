@@ -335,7 +335,7 @@ def is_meaningful_swap(s):
             return False
     return True
 
-def generate_comparative_markdown_report(analysis_result, current_tiers, catalog_map, today_str):
+def generate_comparative_markdown_report(analysis_result, current_tiers, catalog_map, unavailable_models, today_str):
     total_changes = 0
 
     lines = [
@@ -352,6 +352,16 @@ def generate_comparative_markdown_report(analysis_result, current_tiers, catalog
     for g in analysis_result.get("web_search_grounding", []):
         lines.append(f"- {g}")
     lines.append("")
+
+    if unavailable_models:
+        lines.append("---")
+        lines.append("### ⚠️ Confirmed Unavailable / 404 Models Automatically Removed")
+        lines.append("| Model ID | Display Name | Tier | Status |")
+        lines.append("| :--- | :--- | :--- | :--- |")
+        for u in unavailable_models:
+            lines.append(f"| `{u['id']}` | {u['name']} | {u['tier_name'].upper()} | ❌ Missing from OpenRouter Catalog (Purged) |")
+        lines.append("")
+        total_changes += len(unavailable_models)
 
     lines.append("---")
     lines.append("## 📊 Tier-by-Tier Comparative Delta Analysis\n")
@@ -644,7 +654,7 @@ def main():
         error("Could not obtain valid comparative analysis from LLM.")
         sys.exit(1)
 
-    report_md = generate_comparative_markdown_report(analysis_result, current_tiers, catalog_map, today_str)
+    report_md = generate_comparative_markdown_report(analysis_result, current_tiers, catalog_map, unavailable, today_str)
     report_file = "MODEL_RECOMMENDATIONS_REPORT.md"
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report_md)
