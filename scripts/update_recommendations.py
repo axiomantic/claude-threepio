@@ -3,7 +3,7 @@
 Semantic Model Recommender & Comparative Delta Evaluator (LLM + Web Search Grounding)
 Queries OpenRouter models with online web search grounding to analyze the latest
 state of AI models, benchmark rankings, and pricing compared to Anthropic tiers,
-and performs a comprehensive BEFORE vs AFTER delta diff against the active claude-threepio script.
+and performs a non-destructive, minimal-diff update against the active claude-threepio script.
 """
 
 import os
@@ -71,7 +71,6 @@ def extract_current_tiers(setup_path="claude-threepio"):
             "ollama_block": ollama_block
         })
     return tiers
-
 
 def fetch_openrouter_catalog():
     info("Fetching full model catalog from OpenRouter API...")
@@ -149,10 +148,29 @@ def perform_llm_comparative_analysis(api_key, current_tiers, catalog_map, compac
     system_prompt = f"""You are an elite AI systems and LLM infrastructure architect conducting a scheduled comparative evaluation of inference models on OpenRouter for integration into the 'claude-threepio' proxy.
 
 You are provided with:
-1. THE CURRENTLY ACTIVE TIER CONFIGURATION from claude-threepio (what users currently see and use).
+1. THE CURRENTLY ACTIVE TIER CONFIGURATION from claude-threepio (the exact active options and ordering per tier).
 2. THE LIVE OPENROUTER MODEL CATALOG (with current token pricing and context lengths).
 
-Your mission is NOT just to list models, but to conduct an actionable, comparative engineering audit comparing what is CURRENTLY configured in claude-threepio against the newest state of the art available on OpenRouter.
+================================================================================
+CRITICAL MINIMAL-DIFF CONSTRAINTS & NON-DESTRUCTIVE RULES:
+================================================================================
+1. STRICT PRESERVATION OF ORDER:
+   - The ordering of existing models within each tier MUST be strictly preserved.
+   - NEVER shuffle, re-sort, or reorder retained models.
+2. STRICT PRESERVATION OF TEXT & NAMES:
+   - DO NOT rewrite descriptions, alter display names, or tweak wording for existing models.
+   - All existing model names and curated descriptions in claude-threepio must remain untouched.
+3. PRECISE DELTA ACTIONS ONLY:
+   Your job is ONLY to perform four specific types of changes:
+   a) PRICE & CONTEXT SYNC: Update pricing ($In/$Out per 1M) and context window if OpenRouter catalog rates have changed for existing models.
+   b) ADDITIONS: Add newly released or high-impact models present in the provided OpenRouter catalog that represent a clear architectural or cost advantage. New models will be appended to the tier. Provide a concise, multi-bullet technical description formatted to match the codebase style.
+   c) REMOVALS: Remove a model ONLY if it is discontinued, broken, deprecated on OpenRouter, or clearly obsolete.
+   d) RECOMMENDATION SHIFT: Designate exactly 1 model per tier as 'is_recommended': true based on benchmark/price-to-performance leadership.
+4. ABSOLUTELY NO HALLUCINATIONS:
+   - Every model ID MUST exist in the provided OpenRouter catalog list.
+   - NEVER invent non-existent model slugs, unreleased version numbers, or hypothetical variants.
+5. ZERO ARBITRARY CHANGES:
+   - Do NOT generate cosmetic changes or gratuitous diffs. Keep changesets minimal, clean, and surgical.
 
 Anthropic Target Aliases:
 - Opus Tier (claude-opus-4): Heavyweight reasoning, math, complex system architecture. Reference: Claude 3.7 / 4 Opus ($15/$75).
@@ -160,23 +178,6 @@ Anthropic Target Aliases:
 - Haiku Tier (claude-3-haiku-20240307): Maximum economy, high throughput, subagent routing (<$0.30/M).
 - Fable Tier (claude-fable-5): Ultra-heavyweight multi-step agent runtime loops.
 - Mythos Tier (claude-mythos-1): Frontier & experimental flagships.
-
-Instructions:
-1. Use online web search to research recent benchmark rankings (LiveBench, SWE-bench Verified, Arena Elo, Chatbot Arena, Artificial Analysis) and recent major releases (OpenAI, Anthropic, DeepSeek, Moonshot/Kimi, Zhipu/GLM, Qwen/Alibaba, Google, Meta, NVIDIA, Poolside, etc.).
-2. PRICE DIVERSITY & TIER SPECTRUM REQUIREMENT:
-   For EACH tier, curate a balanced spectrum across the curated options:
-   - Free / Zero-Cost Option: Top $0.00 models from OpenRouter's free collection (e.g. models with :free or $0.00 pricing such as Nemotron 3 Ultra 550B, Ox Alpha, North Mini Code, Laguna S, Inkling Small, etc.).
-   - Budget / High-Economy Option: Ultra-low token price (e.g. sub-$0.10/M for Haiku/Sonnet, sub-$1.50/M MoE for Opus/Fable).
-   - Value Workhorse (Default/Recommended): Optimal benchmark score per dollar.
-   - High-Throughput / Specialist: Fast, reliable tool calling, SWE-bench coding leader.
-   - Frontier Ceiling Option: Highest capability ceiling for users prioritizing maximum reasoning.
-3. For EACH tier, compare the CURRENT lineup in claude-threepio vs your PROPOSED updated lineup:
-   - Identify which models are RETAINED, which models are REPLACED/SWAPPED OUT, and which new models are ADDED.
-   - For every swap/change, provide the specific price delta ($In/$Out difference and % change) and benchmark/architectural justification.
-   - Designate 1 model per tier as 'is_recommended': true. If the recommended model is different from the current one, explain why.
-4. Provide an executive summary with cost savings and performance tradeoff matrix.
-5. Output MUST be strictly valid JSON conforming to the schema below.
-
 
 JSON Format Schema:
 {{
@@ -190,27 +191,47 @@ JSON Format Schema:
       "tier_name": "opus",
       "tier_label": "OPUS TIER (Heavyweight Reasoning & Complex Architecture)",
       "claude_name": "claude-opus-4",
-      "current_recommended": "Current Recommended Model Name & ID",
-      "proposed_recommended": "Proposed Recommended Model Name & ID",
+      "current_recommended": "exact_current_model_id",
+      "proposed_recommended": "exact_proposed_model_id",
       "recommended_change_summary": "Why the primary recommendation shifted or was maintained...",
       "delta_analysis": "In-depth analysis of capability changes, pricing differences, and benchmark comparisons for this tier...",
       "swaps_and_changes": [
         {{
-          "action": "SWAP" or "RETAIN" or "ADD",
+          "action": "SYNC" or "ADD" or "REMOVE" or "RETAIN",
           "current_model": "Old Model Name (or None if new)",
           "proposed_model": "New Model Name & ID",
           "price_comparison": "$X.XX/$Y.YY vs $A.AA/$B.BB (Z% delta)",
-          "benchmark_justification": "Why this change is superior..."
+          "benchmark_justification": "Why this change is justified..."
         }}
       ],
-      "options": [
+      "price_syncs": [
         {{
-          "id": "exact_openrouter_model_id",
-          "name": "Clean Display Name",
-          "is_recommended": true,
-          "rationale": "Why included in curated options",
-          "description": "Comprehensive multi-sentence / multi-bullet technical profile (architecture, key benchmarks, 1M context support, and Claude Desktop tier match) with NO truncation or ellipsis."
+          "id": "exact_existing_model_id",
+          "new_price": "$0.50/$1.00",
+          "new_context": "1M Context"
         }}
+      ],
+      "removals": [
+        {{
+          "id": "exact_model_id_to_remove",
+          "rationale": "Why removed"
+        }}
+      ],
+      "additions": [
+        {{
+          "id": "exact_catalog_model_id",
+          "name": "Clean Display Name",
+          "is_recommended": false,
+          "supports1m": true,
+          "price_str": "$X.XX/$Y.YY",
+          "ctx_str": "1M Context",
+          "rationale": "Why added to tier",
+          "description": "Provider's model description summary.\n\n• 1M Context Window: Capacity...\n• Architecture: Details...\n• Recommended Tier Match: Purpose..."
+        }}
+      ],
+      "retained_model_ids_in_order": [
+        "exact_model_id_1",
+        "exact_model_id_2"
       ]
     }}
   ]
@@ -225,7 +246,7 @@ CURRENT ACTIVE CLAUDE-THREEPIO CONFIGURATION:
 AVAILABLE LIVE OPENROUTER CATALOG:
 {json.dumps(compact_catalog[:220], indent=1)}
 
-Please perform web search on recent benchmarks and releases, conduct the comparative delta analysis against the active configuration, and return the structured JSON."""
+Please perform web search on recent benchmarks and releases, conduct the non-destructive comparative delta analysis against the active configuration, and return the structured JSON strictly following the schema and minimal-diff constraints."""
 
     for model_name in models_to_try:
         info(f"Attempting comparative evaluation with model: {model_name}...")
@@ -276,8 +297,6 @@ Please perform web search on recent benchmarks and releases, conduct the compara
     return None
 
 def generate_comparative_markdown_report(analysis_result, current_tiers, catalog_map, today_str):
-    curr_map = {t["tier_name"]: t for t in current_tiers}
-
     lines = [
         f"# 🤖 Weekly Model Recommendations & Comparative Delta Analysis",
         f"**Generated on:** {today_str} UTC  ",
@@ -313,14 +332,14 @@ def generate_comparative_markdown_report(analysis_result, current_tiers, catalog
         if delta_analysis:
             lines.append(f"*{delta_analysis}*\n")
 
-        # Swaps table
+        # Swaps / adjustments table
         swaps = tc.get("swaps_and_changes", [])
         if swaps:
-            lines.append("#### 🔄 Model Swaps & Lineup Adjustments")
+            lines.append("#### 🔄 Lineup Adjustments & Benchmark Rationale")
             lines.append("| Action | Previous Model | Proposed Model | Price Delta | Benchmark & Engineering Justification |")
             lines.append("| :--- | :--- | :--- | :--- | :--- |")
             for s in swaps:
-                action = s.get("action", "SWAP")
+                action = s.get("action", "SYNC")
                 c_mod = s.get("current_model", "-")
                 p_mod = s.get("proposed_model", "-")
                 p_cmp = s.get("price_comparison", "-")
@@ -328,145 +347,214 @@ def generate_comparative_markdown_report(analysis_result, current_tiers, catalog
                 lines.append(f"| **{action}** | {c_mod} | `{p_mod}` | {p_cmp} | {b_just} |")
             lines.append("")
 
-        # Full proposed options table
-        lines.append("#### 📋 Full Proposed Options for Tier")
-        lines.append("| Model ID | Display Name | Live Price ($In / $Out) | Context | Status | Link | Rationale |")
-        lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+        # Additions table
+        adds = tc.get("additions", [])
+        if adds:
+            lines.append("#### ➕ Newly Added Models")
+            lines.append("| Model ID | Display Name | Live Price ($In / $Out) | Context | Status | Link | Rationale |")
+            lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+            for opt in adds:
+                mid = opt.get("id", "")
+                name = opt.get("name", mid)
+                is_rec = opt.get("is_recommended", False)
+                rat = opt.get("rationale", "")
+                cat_item = catalog_map.get(mid)
+                price_str = cat_item["price_str"] if cat_item else opt.get("price_str", "$1.00/$3.00")
+                ctx_str = cat_item["ctx_str"] if cat_item else opt.get("ctx_str", "1M Context")
+                badge = "**⭐ Recommended**" if is_rec else "Alternative"
+                link_str = f"[`{mid}`](https://openrouter.ai/{mid})"
+                lines.append(f"| {link_str} | {name} | **{price_str}** | {ctx_str} | {badge} | [View](https://openrouter.ai/{mid}) | {rat} |")
+            lines.append("")
 
-        for opt in tc.get("options", []):
-            mid = opt.get("id", "")
-            name = opt.get("name", mid)
-            is_rec = opt.get("is_recommended", False)
-            rat = opt.get("rationale", "")
-
-            cat_item = catalog_map.get(mid)
-            if cat_item:
-                price_str = cat_item["price_str"]
-                ctx_str = cat_item["ctx_str"]
-            else:
-                price_str = "Live API"
-                ctx_str = "1M Context"
-
-            badge = "**⭐ Recommended**" if is_rec else "Alternative"
-            link_str = f"[`{mid}`](https://openrouter.ai/{mid})"
-            lines.append(f"| {link_str} | {name} | **{price_str}** | {ctx_str} | {badge} | [View](https://openrouter.ai/{mid}) | {rat} |")
         lines.append("\n---\n")
 
     lines.append("## 💡 Maintainer Action Items")
-    lines.append("- [ ] Review proposed model replacements and pricing deltas above.")
+    lines.append("- [ ] Review proposed model additions, removals, and pricing syncs above.")
     lines.append("- [ ] Verify context window requirements (1M context preserved for agentic flows).")
     lines.append("- [ ] Merge this PR to update the default curated recommendations in `claude-threepio`.")
 
     return "\n".join(lines)
 
+def format_python_description(mid, raw_desc):
+    """Format description into multi-line Python tuple syntax matching claude-threepio style."""
+    lines = [l.strip() for l in raw_desc.strip().split("\n") if l.strip()]
+    if not lines:
+        return f'    "{mid}": (\n        "High-performance AI model available via OpenRouter."\n    ),'
+    
+    intro_parts = []
+    bullet_parts = []
+    for l in lines:
+        if l.startswith("•") or l.startswith("- ") or l.startswith("* "):
+            bullet_text = l.lstrip("•-* ").strip()
+            bullet_parts.append(f'• {bullet_text}')
+        else:
+            intro_parts.append(l)
+    
+    intro_str = " ".join(intro_parts)
+    clean_intro = intro_str.replace('\\', '\\\\').replace('"', '\\"')
+    
+    out = [f'    "{mid}": (']
+    if bullet_parts:
+        out.append(f'        "{clean_intro}\\n\\n"')
+        for i, b in enumerate(bullet_parts):
+            clean_b = b.replace('\\', '\\\\').replace('"', '\\"')
+            nl = '\\n' if i < len(bullet_parts) - 1 else ''
+            out.append(f'        "{clean_b}{nl}"')
+    else:
+        out.append(f'        "{clean_intro}"')
+    out.append('    ),')
+    return "\n".join(out)
+
 def apply_comparative_recommendations(analysis_result, catalog_map, today_str, setup_path="claude-threepio"):
+    """
+    Surgically apply recommendations to claude-threepio:
+    - Retains exact model order in all tiers
+    - Preserves existing display names and text descriptions verbatim
+    - Updates pricing and context in-place when changed
+    - Appends additions cleanly
+    - Drops only explicitly removed models
+    """
     if not os.path.exists(setup_path):
         warn(f"{setup_path} not found.")
         return
 
-    info(f"Applying comparative tier recommendations and rich descriptions to {setup_path}...")
+    info(f"Applying surgical non-destructive updates to {setup_path}...")
     with open(setup_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Extract existing ollama blocks so they are not wiped out
-    current_tiers = extract_current_tiers(setup_path)
-    ollama_by_tier = {t["tier_name"]: t.get("ollama_block") for t in current_tiers}
+    tier_comps = analysis_result.get("tier_comparisons", [])
+    tier_map = {tc.get("tier_name"): tc for tc in tier_comps if tc.get("tier_name")}
 
-    # Collect curated descriptions from proposed options
-    new_descriptions = {}
-    tier_blocks = []
-    for tc in analysis_result.get("tier_comparisons", []):
-        tname = tc.get("tier_name", "")
-        opts_code = []
-        for opt in tc.get("options", []):
-            mid = opt.get("id", "")
-            name = opt.get("name", mid)
-            is_rec = "True" if opt.get("is_recommended", False) else "False"
-            desc = opt.get("description", "").strip()
-            if desc and mid:
-                new_descriptions[mid] = desc
-            
+    # 1. Update options in each tier non-destructively
+    tier_pattern = re.compile(
+        r'(\{\s*"tier_name":\s*"([^"]+)",\s*"tier_label":\s*"[^"]+",\s*"claude_name":\s*"[^"]+",\s*"options":\s*\[)(.*?)(\](?:,\s*"ollama_options":\s*ollama_opts\(\[.*?\]\))?\s*\})',
+        re.DOTALL
+    )
+
+    def update_tier_block(match):
+        header = match.group(1)
+        tname = match.group(2)
+        opt_text = match.group(3)
+        footer = match.group(4)
+
+        tc = tier_map.get(tname)
+        if not tc:
+            return match.group(0)
+
+        removals = {r.get("id") for r in tc.get("removals", []) if r.get("id")}
+        proposed_rec = tc.get("proposed_recommended")
+        price_syncs = {p.get("id"): p for p in tc.get("price_syncs", []) if p.get("id")}
+
+        # Process existing lines preserving exact order
+        new_opt_lines = []
+        for line in opt_text.split("\n"):
+            if not line.strip():
+                continue
+            om = re.search(r'get_model_entry\(catalog,\s*"([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*(True|False)(?:,\s*is_recommended=(True|False))?\)', line)
+            if not om:
+                new_opt_lines.append(line)
+                continue
+
+            mid = om.group(1)
+            name = om.group(2)
+            old_price = om.group(3)
+            old_ctx = om.group(4)
+            old_supp1m = om.group(5)
+            was_rec = (om.group(6) == "True") if om.group(6) else False
+
+            # If removed, drop this line
+            if mid in removals:
+                continue
+
+            # Determine updated pricing/context if available in catalog or price syncs
             cat_item = catalog_map.get(mid)
+            new_price = old_price
+            new_ctx = old_ctx
+            new_supp1m = old_supp1m
+
             if cat_item:
-                p_str = cat_item["price_str"]
-                c_str = cat_item["ctx_str"]
-                supp1m = "True" if cat_item["supports1m"] else "False"
+                new_price = cat_item["price_str"]
+                new_ctx = cat_item["ctx_str"]
+                new_supp1m = "True" if cat_item["supports1m"] else "False"
+            elif mid in price_syncs:
+                new_price = price_syncs[mid].get("new_price", old_price)
+                new_ctx = price_syncs[mid].get("new_context", old_ctx)
+
+            is_rec = (mid == proposed_rec) if proposed_rec else was_rec
+            rec_arg = ", is_recommended=True" if is_rec else ""
+
+            # Check if any value changed
+            if (new_price == old_price and new_ctx == old_ctx and 
+                new_supp1m == old_supp1m and is_rec == was_rec):
+                new_opt_lines.append(line)
             else:
-                p_str = "$1.00/$3.00"
-                c_str = "1M Context"
-                supp1m = "True"
+                new_opt_lines.append(f'                get_model_entry(catalog, "{mid}", "{name}", "{new_price}", "{new_ctx}", {new_supp1m}{rec_arg}),')
 
-            if is_rec == "True":
-                opts_code.append(f'                get_model_entry(catalog, "{mid}", "{name}", "{p_str}", "{c_str}", {supp1m}, is_recommended=True),')
-            else:
-                opts_code.append(f'                get_model_entry(catalog, "{mid}", "{name}", "{p_str}", "{c_str}", {supp1m}),')
+        # Append new additions to the end of the options list
+        for add in tc.get("additions", []):
+            mid = add.get("id")
+            if not mid or mid in removals:
+                continue
+            # Avoid duplicate if already in options
+            if any(f'"{mid}"' in l for l in new_opt_lines):
+                continue
+            name = add.get("name", mid)
+            cat_item = catalog_map.get(mid)
+            p_str = add.get("price_str") or (cat_item["price_str"] if cat_item else "$1.00/$3.00")
+            c_str = add.get("ctx_str") or (cat_item["ctx_str"] if cat_item else "1M Context")
+            supp1m = "True" if (add.get("supports1m") or (cat_item and cat_item["supports1m"])) else "False"
+            is_rec = (mid == proposed_rec) or add.get("is_recommended", False)
+            rec_arg = ", is_recommended=True" if is_rec else ""
+            new_opt_lines.append(f'                get_model_entry(catalog, "{mid}", "{name}", "{p_str}", "{c_str}", {supp1m}{rec_arg}),')
 
-        opts_str = "\n".join(opts_code)
-        ollama_code = ""
-        if ollama_by_tier.get(tname):
-            ollama_code = f',\n            "ollama_options": {ollama_by_tier[tname]}'
+        return header + "\n" + "\n".join(new_opt_lines) + "\n            " + footer
 
-        block = f"""        {{
-            "tier_name": "{tname}",
-            "tier_label": "{tc.get('tier_label')}",
-            "claude_name": "{tc.get('claude_name')}",
-            "options": [
-{opts_str}
-            ]{ollama_code}
-        }}"""
-        tier_blocks.append(block)
+    content = tier_pattern.sub(update_tier_block, content)
 
-    all_tiers_code = "    tiers = [\n" + ",\n".join(tier_blocks) + "\n    ]"
+    # 2. Append new descriptions to CURATED_DESCRIPTIONS without touching existing entries
+    new_desc_entries = []
+    for tc in tier_comps:
+        for add in tc.get("additions", []):
+            mid = add.get("id")
+            desc = add.get("description", "").strip()
+            if mid and desc and f'"{mid}":' not in content:
+                formatted = format_python_description(mid, desc)
+                new_desc_entries.append(formatted)
 
-    updated = re.sub(
-        r"    tiers = \[\n.*?    \]",
-        all_tiers_code,
-        content,
-        flags=re.DOTALL
-    )
+    if new_desc_entries:
+        desc_block_match = re.search(r'(CURATED_DESCRIPTIONS\s*=\s*\{.*?)(\n\}[ \t]*\n\ndef get_model_entry)', content, re.DOTALL)
+        if desc_block_match:
+            insert_text = "\n" + "\n".join(new_desc_entries)
+            content = content[:desc_block_match.start(2)] + insert_text + content[desc_block_match.start(2):]
 
-    # Update CURATED_DESCRIPTIONS if new descriptions were generated
-    if new_descriptions:
-        desc_lines = ["CURATED_DESCRIPTIONS = {"]
-        # Merge existing descriptions from file if parseable
-        existing_desc_match = re.search(r"CURATED_DESCRIPTIONS\s*=\s*\{([^}]+)\}", content, re.DOTALL)
-        merged_dict = {}
-        if existing_desc_match:
-            try:
-                # Safe eval of dict content
-                exec(f"existing_map = {{{existing_desc_match.group(1)}}}", {}, merged_dict)
-                merged_dict = merged_dict.get("existing_map", {})
-            except Exception:
-                pass
-        merged_dict.update(new_descriptions)
-        for k, v in merged_dict.items():
-            clean_v = v.replace('"', '\\"').replace('\n', '\\n')
-            desc_lines.append(f'    "{k}": "{clean_v}",')
-        desc_lines.append("}")
-        new_desc_block = "\n".join(desc_lines)
-        updated = re.sub(
-            r"CURATED_DESCRIPTIONS\s*=\s*\{.*?\n\}",
-            new_desc_block,
-            updated,
-            flags=re.DOTALL
-        )
+    # 3. Append new entries to FRIENDLY_NAMES if needed
+    new_friendly_entries = []
+    for tc in tier_comps:
+        for add in tc.get("additions", []):
+            mid = add.get("id")
+            name = add.get("name", mid)
+            cat_item = catalog_map.get(mid)
+            p_str = add.get("price_str") or (cat_item["price_str"] if cat_item else "$1.00/$3.00")
+            if mid and f'"{mid}":' not in content:
+                new_friendly_entries.append(f'        "{mid}": ("{name}", "{p_str}"),')
 
-    updated = re.sub(
-        r'^MODELS_LAST_REVISITED="[^"]+"',
-        f'MODELS_LAST_REVISITED="{today_str}"',
-        updated,
-        flags=re.MULTILINE
-    )
-    updated = re.sub(
-        r'^MODELS_LAST_REVISITED = "[^"]+"',
+    if new_friendly_entries:
+        fn_match = re.search(r'(FRIENDLY_NAMES\s*=\s*\{.*?)(\n\s*\}\n\s*def get_tier_name)', content, re.DOTALL)
+        if fn_match:
+            insert_fn = "\n" + "\n".join(new_friendly_entries)
+            content = content[:fn_match.start(2)] + insert_fn + content[fn_match.start(2):]
+
+    # 4. Update MODELS_LAST_REVISITED
+    content = re.sub(
+        r'^MODELS_LAST_REVISITED\s*=\s*"[^"]+"',
         f'MODELS_LAST_REVISITED = "{today_str}"',
-        updated,
+        content,
         flags=re.MULTILINE
     )
 
     with open(setup_path, "w", encoding="utf-8") as f:
-        f.write(updated)
-    success(f"Successfully updated tier definitions, curated descriptions, and timestamp ({today_str}) in {setup_path}.")
+        f.write(content)
+    success(f"Successfully applied non-destructive updates to {setup_path} with zero arbitrary diff noise.")
 
 def main():
     apply_mode = "--apply" in sys.argv

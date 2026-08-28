@@ -60,7 +60,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/axiomantic/claude-threep
 `claude-threepio` maps Anthropic tiers (**Opus**, **Sonnet**, **Haiku**, **Fable**, and **Mythos**) to curated, high-efficiency models with real-time pricing and capabilities fetched live from OpenRouter:
 
 * **Paid Workhorses**: Top-ranking models for reasoning, agentic tool use, and coding (e.g. DeepSeek V4 Pro, Gemini 3.7 Flash, Qwen 3.7 Flash, GLM-5.2) at 80–95% lower cost than Claude overages.
-* **$0.00 Free Models**: Curated zero-cost community models from [OpenRouter's Free Collection](https://openrouter.ai/collections/free-models) (e.g. Nemotron 3 Ultra 550B, Ox Alpha, North Mini Code, Laguna S, Inkling Small).
+* **$0.00 Free Models**: Curated zero-cost community models from [OpenRouter's Free Collection](https://openrouter.ai/collections/free-models) (e.g. Nemotron 3 Ultra 550B, North Mini Code, Laguna S, Inkling Small).
 * **Custom Models & Endpoints**: You can specify **any custom OpenRouter model ID** or connect directly to **any OpenAI-compatible endpoint** (local Ollama, LM Studio, vLLM, Aphrodite, LocalAI, or custom gateways).
 * **Interactive 2-Pane TUI**: Run `./claude-threepio models` to launch the interactive selector. The left pane lists models grouped by provider, while the right pane shows real-time metadata, live pricing, context window length, 1M context agent support, and capability descriptions as you navigate.
 
@@ -160,11 +160,11 @@ You can easily verify that your requests are being proxied correctly:
    ============================================================
    [INFO] Streaming live requests in real-time (Press Ctrl+C to stop)...
 
-   [14:05:40] [PROXY ✔] 200 OK ➔ Ox Alpha (8.31s) [Completed]
+   [14:05:40] [PROXY ✔] 200 OK ➔ GLM 5.3 Flash (8.31s) [Completed]
    [14:05:41] [PROXY ➔] Intercepted: 'claude-opus-4'
               ├─ Mapped Slot:     claude-opus-4 (Opus Tier)
-              ├─ Target Model:    Ox Alpha [stealth/ox-alpha]
-              ├─ Rates / Pricing: Stealth Free ($0.00/$0.00)
+              ├─ Target Model:    GLM 5.3 Flash [z-ai/glm-5.3-flash]
+              ├─ Rates / Pricing: $0.075/$0.25
               └─ Remote Endpoint: https://openrouter.ai (OpenRouter Cloud)
    ```
 
