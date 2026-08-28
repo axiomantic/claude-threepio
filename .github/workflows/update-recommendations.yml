@@ -15,7 +15,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  issues: write
 
 jobs:
   update-model-recommendations:
@@ -49,31 +48,24 @@ jobs:
             git commit -m "chore(models): weekly openrouter recommendations update"
             git push -f origin automated/model-catalog-update
 
-            # Attempt creating or updating Pull Request
-            gh pr create --base main --head automated/model-catalog-update \
-              --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
-              --body-file MODEL_RECOMMENDATIONS_REPORT.md \
-              --label "automated-pr,models,dependencies" 2>/dev/null || \
-            gh pr edit automated/model-catalog-update \
-              --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
-              --body-file MODEL_RECOMMENDATIONS_REPORT.md 2>/dev/null || true
+            # Check if PR is already open or closed
+            PR_STATE=$(gh pr view automated/model-catalog-update --json state -q .state 2>/dev/null || echo "NONE")
+            if [[ "$PR_STATE" == "OPEN" ]]; then
+              gh pr edit automated/model-catalog-update \
+                --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
+                --body-file MODEL_RECOMMENDATIONS_REPORT.md
+            elif [[ "$PR_STATE" == "CLOSED" ]]; then
+              gh pr reopen automated/model-catalog-update || true
+              gh pr edit automated/model-catalog-update \
+                --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
+                --body-file MODEL_RECOMMENDATIONS_REPORT.md
+            else
+              gh pr create --base main --head automated/model-catalog-update \
+                --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
+                --body-file MODEL_RECOMMENDATIONS_REPORT.md \
+                --label "automated-pr,models,dependencies" || \
+              gh pr create --base main --head automated/model-catalog-update \
+                --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
+                --body-file MODEL_RECOMMENDATIONS_REPORT.md
+            fi
           fi
-
-      - name: Post Issue with Comparative Evaluation Report
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            if (fs.existsSync('MODEL_RECOMMENDATIONS_REPORT.md')) {
-              const report = fs.readFileSync('MODEL_RECOMMENDATIONS_REPORT.md', 'utf8');
-              const today = new Date().toISOString().split('T')[0];
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `🤖 Weekly OpenRouter Comparative Scan Report (${today})`,
-                body: report + "\n\n---\n*Proposed changes are available on branch [`automated/model-catalog-update`](https://github.com/" + context.repo.owner + "/" + context.repo.repo + "/tree/automated/model-catalog-update).* ",
-                labels: ['model-catalog-scan', 'automated']
-              });
-            }
-
-

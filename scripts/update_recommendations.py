@@ -98,6 +98,10 @@ def build_compact_catalog(models):
         name = m.get("name", mid)
         desc = m.get("description", "")[:160]
 
+        # Ignore batch endpoints and non-standard aliases
+        if ":batch" in mid or mid.startswith("~"):
+            continue
+
         if p_in == 0 and p_out == 0 and "free" not in mid:
             continue
 
@@ -154,36 +158,34 @@ You are provided with:
 ================================================================================
 CRITICAL MINIMAL-DIFF CONSTRAINTS & NON-DESTRUCTIVE RULES:
 ================================================================================
-1. STRICT PRESERVATION OF ORDER:
-   - The ordering of existing models within each tier MUST be strictly preserved.
-   - NEVER shuffle, re-sort, or reorder retained models.
-2. STRICT PRESERVATION OF TEXT & NAMES:
+1. ONLY PROPOSE ACTUAL CHANGES:
+   - Every entry in `swaps_and_changes`, `price_syncs`, `additions`, and `removals` MUST represent an ACTUAL change.
+   - NEVER list unchanged models in `swaps_and_changes` or `price_syncs`. If a model is already in the tier and its price/context have not changed, DO NOT list it in `swaps_and_changes`. Listing "0% delta" or "No change" is strictly prohibited.
+2. STRICT PRESERVATION OF ORDER & TEXT:
+   - The ordering of existing models within each tier MUST be strictly preserved. NEVER shuffle, re-sort, or reorder retained models.
    - DO NOT rewrite descriptions, alter display names, or tweak wording for existing models.
-   - All existing model names and curated descriptions in claude-threepio must remain untouched.
-3. PRECISE DELTA ACTIONS ONLY:
-   Your job is ONLY to perform four specific types of changes:
-   a) PRICE & CONTEXT SYNC: Update pricing ($In/$Out per 1M) and context window if OpenRouter catalog rates have changed for existing models.
-   b) ADDITIONS: Add newly released or high-impact models present in the provided OpenRouter catalog that represent a clear architectural or cost advantage. New models will be appended to the tier. Provide a concise, multi-bullet technical description formatted to match the codebase style.
-   c) REMOVALS: Remove a model ONLY if it is discontinued, broken, deprecated on OpenRouter, or clearly obsolete.
-   d) RECOMMENDATION SHIFT: Designate exactly 1 model per tier as 'is_recommended': true based on benchmark/price-to-performance leadership.
-4. ABSOLUTELY NO HALLUCINATIONS:
+3. NO BATCH, ALIAS, OR NON-INTERACTIVE MODELS:
+   - DO NOT propose ':batch' models, internal '~' alias models, or duplicate minor variations. claude-threepio is a real-time streaming proxy for interactive coding in Claude Desktop and Claude Code CLI.
+4. STRICTLY CONSERVATIVE ADDITIONS:
+   - Only propose adding a new model if it is a major newly released model or a clear benchmark/cost breakthrough not already present in the tier.
+   - Do NOT add models just to pad the options list. If a tier is already well-covered, propose no additions for it.
+5. GROUNDING FOCUS:
+   - Web search findings MUST focus ONLY on genuinely new releases, major benchmark updates, or pricing reductions that happened recently. Do NOT describe models already present in claude-threepio (e.g. Claude Sonnet 4/5, Claude Opus 5, GLM 5.3 Flash, Gemini 3.7 Flash) as "new".
+6. ABSOLUTELY NO HALLUCINATIONS:
    - Every model ID MUST exist in the provided OpenRouter catalog list.
-   - NEVER invent non-existent model slugs, unreleased version numbers, or hypothetical variants.
-5. ZERO ARBITRARY CHANGES:
-   - Do NOT generate cosmetic changes or gratuitous diffs. Keep changesets minimal, clean, and surgical.
 
 Anthropic Target Aliases:
-- Opus Tier (claude-opus-4): Heavyweight reasoning, math, complex system architecture. Reference: Claude 3.7 / 4 Opus ($15/$75).
-- Sonnet Tier (claude-sonnet-4-5): Fast agentic coding workhorse, tool calling, SWE-bench leader. Reference: Claude 3.5 / 3.7 Sonnet ($3/$15).
+- Opus Tier (claude-opus-4): Heavyweight reasoning, math, complex system architecture.
+- Sonnet Tier (claude-sonnet-4-5): Fast agentic coding workhorse, tool calling, SWE-bench leader.
 - Haiku Tier (claude-3-haiku-20240307): Maximum economy, high throughput, subagent routing (<$0.30/M).
 - Fable Tier (claude-fable-5): Ultra-heavyweight multi-step agent runtime loops.
 - Mythos Tier (claude-mythos-1): Frontier & experimental flagships.
 
 JSON Format Schema:
 {{
-  "executive_summary": "High-level summary of industry shifts, newly released models, and benchmark progress...",
+  "executive_summary": "High-level summary of genuine industry shifts, newly released models, and benchmark progress...",
   "web_search_grounding": [
-    "Grounding point 1 with benchmark citations (LiveBench, SWE-bench, Arena Elo)...",
+    "Grounding point 1 focusing on genuine new releases or benchmark shifts...",
     "Grounding point 2..."
   ],
   "tier_comparisons": [
@@ -193,15 +195,15 @@ JSON Format Schema:
       "claude_name": "claude-opus-4",
       "current_recommended": "exact_current_model_id",
       "proposed_recommended": "exact_proposed_model_id",
-      "recommended_change_summary": "Why the primary recommendation shifted or was maintained...",
-      "delta_analysis": "In-depth analysis of capability changes, pricing differences, and benchmark comparisons for this tier...",
+      "recommended_change_summary": "Why the primary recommendation shifted, or empty if unchanged.",
+      "delta_analysis": "In-depth analysis of actual capability changes or pricing shifts for this tier, or stating tier is optimal.",
       "swaps_and_changes": [
         {{
-          "action": "SYNC" or "ADD" or "REMOVE" or "RETAIN",
+          "action": "SYNC" or "ADD" or "REMOVE",
           "current_model": "Old Model Name (or None if new)",
           "proposed_model": "New Model Name & ID",
           "price_comparison": "$X.XX/$Y.YY vs $A.AA/$B.BB (Z% delta)",
-          "benchmark_justification": "Why this change is justified..."
+          "benchmark_justification": "Why this specific change is necessary..."
         }}
       ],
       "price_syncs": [
@@ -228,10 +230,6 @@ JSON Format Schema:
           "rationale": "Why added to tier",
           "description": "Provider's model description summary.\n\n• 1M Context Window: Capacity...\n• Architecture: Details...\n• Recommended Tier Match: Purpose..."
         }}
-      ],
-      "retained_model_ids_in_order": [
-        "exact_model_id_1",
-        "exact_model_id_2"
       ]
     }}
   ]
@@ -246,7 +244,7 @@ CURRENT ACTIVE CLAUDE-THREEPIO CONFIGURATION:
 AVAILABLE LIVE OPENROUTER CATALOG:
 {json.dumps(compact_catalog[:220], indent=1)}
 
-Please perform web search on recent benchmarks and releases, conduct the non-destructive comparative delta analysis against the active configuration, and return the structured JSON strictly following the schema and minimal-diff constraints."""
+Please perform web search on recent benchmarks and releases, conduct the non-destructive comparative delta analysis against the active configuration, and return the structured JSON. Remember: ONLY propose actual changes (no no-op entries), preserve order/names/descriptions, and strictly follow the minimal-diff rules."""
 
     for model_name in models_to_try:
         info(f"Attempting comparative evaluation with model: {model_name}...")
@@ -296,7 +294,27 @@ Please perform web search on recent benchmarks and releases, conduct the non-des
     error("All candidate models failed to return a valid comparative evaluation.")
     return None
 
+def is_meaningful_swap(s):
+    """Filter out no-op or 0% delta entries that don't represent actual changes."""
+    action = s.get("action", "").upper()
+    if action in ("ADD", "REMOVE"):
+        return True
+    p_cmp = s.get("price_comparison", "")
+    b_just = s.get("benchmark_justification", "").lower()
+    c_mod = s.get("current_model", "")
+    p_mod = s.get("proposed_model", "")
+    
+    if "0% delta" in p_cmp or "0.0%" in p_cmp or "no change" in b_just:
+        return False
+    if c_mod == p_mod and "vs" in p_cmp:
+        parts = p_cmp.split("vs")
+        if len(parts) == 2 and parts[0].strip() == parts[1].strip():
+            return False
+    return True
+
 def generate_comparative_markdown_report(analysis_result, current_tiers, catalog_map, today_str):
+    total_changes = 0
+
     lines = [
         f"# 🤖 Weekly Model Recommendations & Comparative Delta Analysis",
         f"**Generated on:** {today_str} UTC  ",
@@ -324,35 +342,46 @@ def generate_comparative_markdown_report(analysis_result, current_tiers, catalog
         rec_sum = tc.get("recommended_change_summary", "")
         delta_analysis = tc.get("delta_analysis", "")
 
-        lines.append(f"### 🏷️ {tlabel} (`{cname}`)")
-        lines.append(f"- **Current Recommended (in `claude-threepio`):** `{curr_rec}`")
-        lines.append(f"- **Proposed Recommended:** **`{prop_rec}`**")
-        if rec_sum:
-            lines.append(f"- **Recommendation Shift Rationale:** {rec_sum}\n")
-        if delta_analysis:
-            lines.append(f"*{delta_analysis}*\n")
+        tier_has_changes = False
 
-        # Swaps / adjustments table
-        swaps = tc.get("swaps_and_changes", [])
-        if swaps:
-            lines.append("#### 🔄 Lineup Adjustments & Benchmark Rationale")
-            lines.append("| Action | Previous Model | Proposed Model | Price Delta | Benchmark & Engineering Justification |")
-            lines.append("| :--- | :--- | :--- | :--- | :--- |")
-            for s in swaps:
+        tier_lines = [
+            f"### 🏷️ {tlabel} (`{cname}`)",
+            f"- **Current Recommended (in `claude-threepio`):** `{curr_rec}`",
+            f"- **Proposed Recommended:** **`{prop_rec}`**"
+        ]
+        if rec_sum and curr_rec != prop_rec:
+            tier_lines.append(f"- **Recommendation Shift Rationale:** {rec_sum}\n")
+            tier_has_changes = True
+        if delta_analysis:
+            tier_lines.append(f"*{delta_analysis}*\n")
+
+        # Filter swaps / adjustments to only real changes
+        raw_swaps = tc.get("swaps_and_changes", [])
+        real_swaps = [s for s in raw_swaps if is_meaningful_swap(s)]
+
+        if real_swaps:
+            tier_has_changes = True
+            total_changes += len(real_swaps)
+            tier_lines.append("#### 🔄 Lineup Adjustments & Benchmark Rationale")
+            tier_lines.append("| Action | Previous Model | Proposed Model | Price Delta | Benchmark & Engineering Justification |")
+            tier_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+            for s in real_swaps:
                 action = s.get("action", "SYNC")
                 c_mod = s.get("current_model", "-")
                 p_mod = s.get("proposed_model", "-")
                 p_cmp = s.get("price_comparison", "-")
                 b_just = s.get("benchmark_justification", "-")
-                lines.append(f"| **{action}** | {c_mod} | `{p_mod}` | {p_cmp} | {b_just} |")
-            lines.append("")
+                tier_lines.append(f"| **{action}** | {c_mod} | `{p_mod}` | {p_cmp} | {b_just} |")
+            tier_lines.append("")
 
         # Additions table
         adds = tc.get("additions", [])
         if adds:
-            lines.append("#### ➕ Newly Added Models")
-            lines.append("| Model ID | Display Name | Live Price ($In / $Out) | Context | Status | Link | Rationale |")
-            lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+            tier_has_changes = True
+            total_changes += len(adds)
+            tier_lines.append("#### ➕ Newly Added Models")
+            tier_lines.append("| Model ID | Display Name | Live Price ($In / $Out) | Context | Status | Link | Rationale |")
+            tier_lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
             for opt in adds:
                 mid = opt.get("id", "")
                 name = opt.get("name", mid)
@@ -363,15 +392,23 @@ def generate_comparative_markdown_report(analysis_result, current_tiers, catalog
                 ctx_str = cat_item["ctx_str"] if cat_item else opt.get("ctx_str", "1M Context")
                 badge = "**⭐ Recommended**" if is_rec else "Alternative"
                 link_str = f"[`{mid}`](https://openrouter.ai/{mid})"
-                lines.append(f"| {link_str} | {name} | **{price_str}** | {ctx_str} | {badge} | [View](https://openrouter.ai/{mid}) | {rat} |")
-            lines.append("")
+                tier_lines.append(f"| {link_str} | {name} | **{price_str}** | {ctx_str} | {badge} | [View](https://openrouter.ai/{mid}) | {rat} |")
+            tier_lines.append("")
 
+        if not tier_has_changes:
+            tier_lines.append("✅ **All models up-to-date.** No changes proposed for this tier.\n")
+
+        lines.extend(tier_lines)
         lines.append("\n---\n")
 
-    lines.append("## 💡 Maintainer Action Items")
-    lines.append("- [ ] Review proposed model additions, removals, and pricing syncs above.")
-    lines.append("- [ ] Verify context window requirements (1M context preserved for agentic flows).")
-    lines.append("- [ ] Merge this PR to update the default curated recommendations in `claude-threepio`.")
+    if total_changes == 0:
+        lines.append("## 💡 Maintainer Action Items")
+        lines.append("✅ No model changes or pricing syncs required this week. All tiers are operating with optimal configurations.")
+    else:
+        lines.append("## 💡 Maintainer Action Items")
+        lines.append("- [ ] Review proposed model additions, removals, and pricing syncs above.")
+        lines.append("- [ ] Verify context window requirements (1M context preserved for agentic flows).")
+        lines.append("- [ ] Merge this PR to update the default curated recommendations in `claude-threepio`.")
 
     return "\n".join(lines)
 
