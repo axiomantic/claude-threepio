@@ -43,28 +43,24 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [[ -n $(git status --porcelain) ]]; then
-            git checkout -B automated/model-catalog-update
+            git checkout -B automated/model-updates
             git add claude-threepio MODEL_RECOMMENDATIONS_REPORT.md
             git commit -m "chore(models): weekly openrouter recommendations update"
-            git push -f origin automated/model-catalog-update
+            git push -f origin automated/model-updates
 
-            # Check if PR is already open or closed
-            PR_STATE=$(gh pr view automated/model-catalog-update --json state -q .state 2>/dev/null || echo "NONE")
+            # Check if PR is already open
+            PR_STATE=$(gh pr view automated/model-updates --json state -q .state 2>/dev/null || echo "NONE")
             if [[ "$PR_STATE" == "OPEN" ]]; then
-              gh pr edit automated/model-catalog-update \
+              gh pr edit automated/model-updates \
                 --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
                 --body-file MODEL_RECOMMENDATIONS_REPORT.md
             elif [[ "$PR_STATE" == "CLOSED" ]]; then
-              gh pr reopen automated/model-catalog-update || true
-              gh pr edit automated/model-catalog-update \
+              gh pr reopen automated/model-updates || true
+              gh pr edit automated/model-updates \
                 --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
                 --body-file MODEL_RECOMMENDATIONS_REPORT.md
             else
-              gh pr create --base main --head automated/model-catalog-update \
-                --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
-                --body-file MODEL_RECOMMENDATIONS_REPORT.md \
-                --label "automated-pr,models,dependencies" || \
-              gh pr create --base main --head automated/model-catalog-update \
+              gh pr create --base main --head automated/model-updates \
                 --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
                 --body-file MODEL_RECOMMENDATIONS_REPORT.md
             fi
