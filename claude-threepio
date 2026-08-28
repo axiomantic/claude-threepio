@@ -658,12 +658,12 @@ CURATED_DESCRIPTIONS = {
         "• High Accuracy: Tuned on NVIDIA's reasoning and algorithmic datasets.\n"
         "• Free Sonnet / Haiku Option: Highly responsive zero-cost daily driver."
     ),
-    "nvidia/nemotron-nano-12b-v2-vl:free": (
-        "NVIDIA's efficient 12B multimodal/text reasoning model from the Free Collection. Fast response times, "
-        "125k context window, and lightweight memory footprint.\n\n"
-        "• 125k Context Window: Generous capacity for short tasks, utility commands, and context retrieval.\n"
-        "• Fast Execution: Instantaneous token generation for quick lookups and edits.\n"
-        "• Free Community Option: Zero API cost on OpenRouter."
+    "google/gemma-4-31b-it:free": (
+        "Google's instruction-tuned Gemma 4 31B model from the OpenRouter Free Collection. Offers 262k context window, "
+        "strong analytical reasoning, code understanding, and fast turnarounds at zero cost.\n\n"
+        "• 262k Context Window: Broad memory for codebase navigation, multi-turn chat, and script generation.\n"
+        "• State-of-the-Art Open Weights: High benchmark scores across reasoning and software tasks.\n"
+        "• Free Cloud Tier: 100% zero-cost community inference."
     ),
     "qwen/qwen3.7-flash": (
         "Alibaba Cloud's ultra-budget workhorse at $0.03/$0.13 per 1M tokens. Features 1M context window, lightning-fast "
@@ -672,11 +672,11 @@ CURATED_DESCRIPTIONS = {
         "• Ultra-Low Cost: Run millions of tokens for pennies without worrying about API spend.\n"
         "• Recommended Haiku Tier Match: Top choice for lightweight tasks, rapid answers, and background indexing."
     ),
-    "google/gemini-2.0-flash-001": (
-        "Google's high-speed multimodal production model with 1M context window, real-time response speeds, and robust tool execution.\n\n"
-        "• 1M Multimodal Window: Ingests documents, screenshots, and extensive code trees.\n"
-        "• Sub-Second Latency: Instantaneous first-token delivery for rapid conversational flow.\n"
-        "• Cost-Effective: High reliability and speed at $0.10/$0.40 per 1M tokens."
+    "google/gemini-2.5-flash-lite": (
+        "Google's ultra-responsive multimodal model with 1M context window, high generation speeds, and efficient tool calling.\n\n"
+        "• 1M Extended Window: Ingests documents, repositories, and complex datasets seamlessly.\n"
+        "• Sub-Second Latency: Instantaneous first-token delivery for rapid interactive workflows.\n"
+        "• Cost-Effective: High throughput and reliability at $0.10/$0.40 per 1M tokens."
     ),
     "qwen/qwen3-coder-next": (
         "Next-generation code reasoning model from Alibaba Cloud. Strong performance across automated refactoring, unit test "
@@ -725,18 +725,12 @@ CURATED_DESCRIPTIONS = {
         "• Instant Latency: High generation speed for quick lookups and short tasks.\n"
         "• Free Haiku Tier Driver: Perfect for budget-conscious developers."
     ),
-    "nvidia/nemotron-3-nano-30b-a3b:free": (
-        "NVIDIA's 30B efficient nano model from the Free Collection, optimized for fast lightweight reasoning with 256k context.\n\n"
-        "• 256k Context Window: Long context support for document and code review.\n"
-        "• Lightweight MoE: Fast token generation and low compute footprint.\n"
-        "• Free Cloud Inference: Available at $0.00 cost on OpenRouter."
-    ),
     "thinkingmachines/inkling-small:free": (
-        "Thinking Machines' ultra-compact reasoning model from the Free Collection, designed for quick classification and "
-        "lightweight tool calling.\n\n"
-        "• 262k Context Window: Generous capacity for short tasks and context retrieval.\n"
-        "• Specialized Micro Model: Fast execution for simple queries and parsing.\n"
-        "• Free Community Option: Zero API cost."
+        "Thinking Machines' compact reasoning model from the Free Collection with full 1M context window, designed for "
+        "rapid search, repository indexing, and lightweight tool calling at zero cost.\n\n"
+        "• 1M Context Window: Deep context capacity for full codebase indexing and long conversations.\n"
+        "• High Throughput: Fast execution for interactive queries, file editing, and test runs.\n"
+        "• Free Cloud Tier: Available at $0.00 zero cost on OpenRouter."
     ),
     "inclusionai/ling-3.0-flash": (
         "Inclusion AI's ultra-low latency model at $0.02/$0.06 per 1M tokens, optimized for rapid text operations and structured parsing.\n\n"
@@ -1997,7 +1991,7 @@ def run_model_configuration(initial_step=0):
                 get_model_entry(catalog, "nvidia/nemotron-3-super-120b-a12b:free", "Nemotron 3 Super 120B (Free)", "$0.00/$0.00", "256k Context", False),
                 get_model_entry(catalog, "qwen/qwen3.7-flash", "Qwen 3.7 Flash", "$0.03/$0.13", "1M Context", True),
                 get_model_entry(catalog, "deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", "$0.50/$1.00", "1M Context", True),
-                get_model_entry(catalog, "google/gemini-2.0-flash-001", "Gemini 2.0 Flash", "$0.10/$0.40", "1M Context", True),
+                get_model_entry(catalog, "google/gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite", "$0.10/$0.40", "1M Context", True),
                 get_model_entry(catalog, "qwen/qwen3-coder-next", "Qwen3 Coder Next", "$0.12/$0.80", "262k Context", False),
                 get_model_entry(catalog, "qwen/qwen3-coder-30b-a3b-instruct", "Qwen3 Coder 30B", "$0.07/$0.28", "262k Context", False),
                 get_model_entry(catalog, "mistralai/codestral-2508", "Codestral 2508", "$0.30/$0.90", "256k Context", False),
@@ -2017,8 +2011,8 @@ def run_model_configuration(initial_step=0):
             "options": [
                 get_model_entry(catalog, "qwen/qwen3.7-flash", "Qwen 3.7 Flash", "$0.03/$0.13", "1M Context", True, is_recommended=True),
                 get_model_entry(catalog, "nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning (Free)", "$0.00/$0.00", "1M Context", True),
-                get_model_entry(catalog, "nvidia/nemotron-3-nano-30b-a3b:free", "Nemotron 3 Nano 30B (Free)", "$0.00/$0.00", "256k Context", False),
-                get_model_entry(catalog, "nvidia/nemotron-nano-12b-v2-vl:free", "Nemotron Nano 12B VL (Free)", "$0.00/$0.00", "125k Context", False),
+                get_model_entry(catalog, "thinkingmachines/inkling-small:free", "Inkling Small (Free)", "$0.00/$0.00", "1M Context", True),
+                get_model_entry(catalog, "google/gemma-4-31b-it:free", "Gemma 4 31B (Free)", "$0.00/$0.00", "262k Context", False),
                 get_model_entry(catalog, "deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "$0.08/$0.15", "1M Context", True),
                 get_model_entry(catalog, "inclusionai/ling-3.0-flash", "Ling 3.0 Flash", "$0.02/$0.06", "262k Context", False),
                 get_model_entry(catalog, "openai/gpt-oss-120b", "GPT-OSS 120B", "$0.03/$0.17", "131k Context", False),
@@ -2519,8 +2513,9 @@ def regenerate_guardrail_from_config():
         "nvidia/nemotron-3-ultra-550b-a55b:free": ("Nemotron 3 Ultra 550B", "Free ($0.00)"),
         "nvidia/nemotron-3-super-120b-a12b:free": ("Nemotron 3 Super 120B", "Free ($0.00)"),
         "nvidia/nemotron-3.5-lightning:free": ("Nemotron 3.5 Lightning", "Free ($0.00)"),
-        "nvidia/nemotron-3-nano-30b-a3b:free": ("Nemotron 3 Nano 30B", "Free ($0.00)"),
-        "nvidia/nemotron-nano-12b-v2-vl:free": ("Nemotron Nano 12B VL", "Free ($0.00)"),
+        "thinkingmachines/inkling-small:free": ("Inkling Small", "Free ($0.00)"),
+        "google/gemma-4-31b-it:free": ("Gemma 4 31B", "Free ($0.00)"),
+        "google/gemini-2.5-flash-lite": ("Gemini 2.5 Flash Lite", "$0.10/$0.40"),
         "cohere/north-mini-code:free": ("North Mini Code", "Free ($0.00)"),
         "poolside/laguna-s-2.1:free": ("Laguna S 2.1", "Free ($0.00)"),
         "deepseek/deepseek-v4-pro": ("DeepSeek V4 Pro", "$0.50/$1.00"),

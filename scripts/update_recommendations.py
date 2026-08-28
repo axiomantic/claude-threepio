@@ -3,7 +3,8 @@
 Semantic Model Recommender & Comparative Delta Evaluator (LLM + Web Search Grounding)
 Queries OpenRouter models with online web search grounding to analyze the latest
 state of AI models, benchmark rankings, and pricing compared to Anthropic tiers,
-and performs a non-destructive, minimal-diff update against the active claude-threepio script.
+validates live catalog availability, and performs a non-destructive, minimal-diff update
+against the active claude-threepio script.
 """
 
 import os
@@ -127,7 +128,21 @@ def build_compact_catalog(models):
         })
     return catalog_map, compact_list
 
-def perform_llm_comparative_analysis(api_key, current_tiers, catalog_map, compact_catalog, today_str):
+def check_unavailable_models(current_tiers, catalog_map):
+    """Identify any configured models in claude-threepio that are missing or 404 on OpenRouter."""
+    unavailable = []
+    for t in current_tiers:
+        for opt in t.get("options", []):
+            mid = opt.get("id")
+            if mid and mid not in catalog_map:
+                unavailable.append({
+                    "id": mid,
+                    "name": opt.get("name", mid),
+                    "tier_name": t.get("tier_name")
+                })
+    return unavailable
+
+def perform_llm_comparative_analysis(api_key, current_tiers, catalog_map, compact_catalog, unavailable_models, today_str):
     info("Querying LLM agent with online web search plugin for comparative delta evaluation...")
 
     preferred_candidates = [
@@ -149,11 +164,14 @@ def perform_llm_comparative_analysis(api_key, current_tiers, catalog_map, compac
         if not models_to_try:
             models_to_try = preferred_candidates
 
+    unavail_str = json.dumps(unavailable_models, indent=2) if unavailable_models else "None"
+
     system_prompt = f"""You are an elite AI systems and LLM infrastructure architect conducting a scheduled comparative evaluation of inference models on OpenRouter for integration into the 'claude-threepio' proxy.
 
 You are provided with:
 1. THE CURRENTLY ACTIVE TIER CONFIGURATION from claude-threepio (the exact active options and ordering per tier).
 2. THE LIVE OPENROUTER MODEL CATALOG (with current token pricing and context lengths).
+3. UNAVAILABLE / DEPRECATED MODELS DETECTED IN ACTIVE CONFIG: Models that no longer exist or return 404 on OpenRouter.
 
 ================================================================================
 CRITICAL MINIMAL-DIFF CONSTRAINTS & NON-DESTRUCTIVE RULES:
@@ -164,14 +182,16 @@ CRITICAL MINIMAL-DIFF CONSTRAINTS & NON-DESTRUCTIVE RULES:
 2. STRICT PRESERVATION OF ORDER & TEXT:
    - The ordering of existing models within each tier MUST be strictly preserved. NEVER shuffle, re-sort, or reorder retained models.
    - DO NOT rewrite descriptions, alter display names, or tweak wording for existing models.
-3. NO BATCH, ALIAS, OR NON-INTERACTIVE MODELS:
+3. REMOVE UNAVAILABLE / 404 MODELS:
+   - Any model listed in UNAVAILABLE / DEPRECATED MODELS MUST be placed in `removals` (and optionally replaced with an active equivalent in `additions`).
+4. NO BATCH, ALIAS, OR NON-INTERACTIVE MODELS:
    - DO NOT propose ':batch' models, internal '~' alias models, or duplicate minor variations. claude-threepio is a real-time streaming proxy for interactive coding in Claude Desktop and Claude Code CLI.
-4. STRICTLY CONSERVATIVE ADDITIONS:
+5. STRICTLY CONSERVATIVE ADDITIONS:
    - Only propose adding a new model if it is a major newly released model or a clear benchmark/cost breakthrough not already present in the tier.
    - Do NOT add models just to pad the options list. If a tier is already well-covered, propose no additions for it.
-5. GROUNDING FOCUS:
+6. GROUNDING FOCUS:
    - Web search findings MUST focus ONLY on genuinely new releases, major benchmark updates, or pricing reductions that happened recently. Do NOT describe models already present in claude-threepio (e.g. Claude Sonnet 4/5, Claude Opus 5, GLM 5.3 Flash, Gemini 3.7 Flash) as "new".
-6. ABSOLUTELY NO HALLUCINATIONS:
+7. ABSOLUTELY NO HALLUCINATIONS:
    - Every model ID MUST exist in the provided OpenRouter catalog list.
 
 Anthropic Target Aliases:
@@ -216,7 +236,7 @@ JSON Format Schema:
       "removals": [
         {{
           "id": "exact_model_id_to_remove",
-          "rationale": "Why removed"
+          "rationale": "Why removed (e.g. 404 / unavailable on OpenRouter)"
         }}
       ],
       "additions": [
@@ -241,10 +261,13 @@ JSON Format Schema:
 CURRENT ACTIVE CLAUDE-THREEPIO CONFIGURATION:
 {json.dumps(current_tiers, indent=2)}
 
+UNAVAILABLE / DEPRECATED MODELS DETECTED IN ACTIVE CONFIG (MUST BE REMOVED/REPLACED):
+{unavail_str}
+
 AVAILABLE LIVE OPENROUTER CATALOG:
 {json.dumps(compact_catalog[:220], indent=1)}
 
-Please perform web search on recent benchmarks and releases, conduct the non-destructive comparative delta analysis against the active configuration, and return the structured JSON. Remember: ONLY propose actual changes (no no-op entries), preserve order/names/descriptions, and strictly follow the minimal-diff rules."""
+Please perform web search on recent benchmarks and releases, conduct the non-destructive comparative delta analysis against the active configuration, purge any unavailable 404 models, and return the structured JSON strictly following the minimal-diff rules."""
 
     for model_name in models_to_try:
         info(f"Attempting comparative evaluation with model: {model_name}...")
@@ -449,7 +472,7 @@ def apply_comparative_recommendations(analysis_result, catalog_map, today_str, s
     - Preserves existing display names and text descriptions verbatim
     - Updates pricing and context in-place when changed
     - Appends additions cleanly
-    - Drops only explicitly removed models
+    - Drops explicitly removed models and models unavailable on OpenRouter
     """
     if not os.path.exists(setup_path):
         warn(f"{setup_path} not found.")
@@ -499,8 +522,8 @@ def apply_comparative_recommendations(analysis_result, catalog_map, today_str, s
             old_supp1m = om.group(5)
             was_rec = (om.group(6) == "True") if om.group(6) else False
 
-            # If removed, drop this line
-            if mid in removals:
+            # If removed or completely unavailable on OpenRouter catalog, drop this line
+            if mid in removals or (catalog_map and mid not in catalog_map and "ollama" not in mid and "local" not in mid):
                 continue
 
             # Determine updated pricing/context if available in catalog or price syncs
@@ -611,7 +634,12 @@ def main():
 
     catalog_map, compact_catalog = build_compact_catalog(catalog)
 
-    analysis_result = perform_llm_comparative_analysis(api_key, current_tiers, catalog_map, compact_catalog, today_str)
+    # Check for unavailable or deprecated models in current active tiers
+    unavailable = check_unavailable_models(current_tiers, catalog_map)
+    if unavailable:
+        warn(f"Detected {len(unavailable)} configured model(s) missing from OpenRouter catalog: {[u['id'] for u in unavailable]}")
+
+    analysis_result = perform_llm_comparative_analysis(api_key, current_tiers, catalog_map, compact_catalog, unavailable, today_str)
     if not analysis_result:
         error("Could not obtain valid comparative analysis from LLM.")
         sys.exit(1)
