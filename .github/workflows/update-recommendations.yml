@@ -43,25 +43,55 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [[ -n $(git status --porcelain) ]]; then
-            git checkout -B automated/model-updates
+            BRANCH="automated/model-updates"
+            git checkout -B "$BRANCH"
             git add claude-threepio MODEL_RECOMMENDATIONS_REPORT.md
             git commit -m "chore(models): weekly openrouter recommendations update"
-            git push -f origin automated/model-updates
+            git push -f origin "$BRANCH"
 
-            # Check if PR is already open
-            PR_STATE=$(gh pr view automated/model-updates --json state -q .state 2>/dev/null || echo "NONE")
-            if [[ "$PR_STATE" == "OPEN" ]]; then
-              gh pr edit automated/model-updates \
+            # 1. Check if PR is already open on this branch
+            PR_URL=$(gh pr list --head "$BRANCH" --state open --json url -q '.[0].url' 2>/dev/null || true)
+            if [[ -n "$PR_URL" ]]; then
+              echo "Existing open PR found ($PR_URL). Updating body..."
+              gh pr edit "$BRANCH" \
                 --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
                 --body-file MODEL_RECOMMENDATIONS_REPORT.md
-            elif [[ "$PR_STATE" == "CLOSED" ]]; then
-              gh pr reopen automated/model-updates || true
-              gh pr edit automated/model-updates \
+              exit 0
+            fi
+
+            # 2. Check if a closed PR exists and attempt reopening
+            CLOSED_PR=$(gh pr list --head "$BRANCH" --state closed --json number -q '.[0].number' 2>/dev/null || true)
+            REOPENED=false
+            if [[ -n "$CLOSED_PR" ]]; then
+              echo "Attempting to resurrect/reopen closed PR #$CLOSED_PR..."
+              if gh pr reopen "$CLOSED_PR" 2>/dev/null; then
+                gh pr edit "$CLOSED_PR" \
+                  --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
+                  --body-file MODEL_RECOMMENDATIONS_REPORT.md
+                REOPENED=true
+                echo "Successfully resurrected PR #$CLOSED_PR."
+                exit 0
+              else
+                echo "GitHub API rejected reopening closed PR #$CLOSED_PR."
+              fi
+            fi
+
+            # 3. Try creating PR on default branch
+            if [[ "$REOPENED" != "true" ]]; then
+              echo "Creating new PR on $BRANCH..."
+              if ! gh pr create --base main --head "$BRANCH" \
                 --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
-                --body-file MODEL_RECOMMENDATIONS_REPORT.md
-            else
-              gh pr create --base main --head automated/model-updates \
-                --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
-                --body-file MODEL_RECOMMENDATIONS_REPORT.md
+                --body-file MODEL_RECOMMENDATIONS_REPORT.md 2>/dev/null; then
+                
+                # 4. If GitHub refuses due to a closed PR tombstone on this branch name,
+                # create a fresh timestamped branch and open the PR from it
+                DATE_BRANCH="automated/model-updates-$(date +%Y%m%d)"
+                echo "Fallback: Opening PR from fresh branch $DATE_BRANCH..."
+                git checkout -B "$DATE_BRANCH"
+                git push -f origin "$DATE_BRANCH"
+                gh pr create --base main --head "$DATE_BRANCH" \
+                  --title "🤖 Weekly OpenRouter Model Recommendations & Delta Update" \
+                  --body-file MODEL_RECOMMENDATIONS_REPORT.md
+              fi
             fi
           fi
