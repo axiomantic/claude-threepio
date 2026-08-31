@@ -2610,7 +2610,7 @@ class StrictModelGuardrail(CustomLogger):
             print(f"           └─ Remote Endpoint: {{m_dest}}", flush=True)
             data["model"] = canonical
 
-        # Sanitize message payload: remove empty/whitespace-only thinking blocks
+        # Sanitize message payload: remove empty thinking blocks and invalid extra fields
         messages = data.get("messages")
         if isinstance(messages, list):
             cleaned_messages = []
@@ -2618,10 +2618,14 @@ class StrictModelGuardrail(CustomLogger):
                 if isinstance(msg, dict) and "content" in msg and isinstance(msg["content"], list):
                     cleaned_content = []
                     for block in msg["content"]:
-                        if isinstance(block, dict) and block.get("type") == "thinking":
-                            tval = block.get("thinking", "")
-                            if not tval or not str(tval).strip():
-                                continue  # Drop empty thinking block to prevent 400 validation error
+                        if isinstance(block, dict):
+                            if block.get("type") == "thinking":
+                                tval = block.get("thinking", "")
+                                if not tval or not str(tval).strip():
+                                    continue  # Drop empty thinking block to prevent 400 validation error
+                            elif block.get("type") == "tool_use":
+                                block = dict(block)
+                                block.pop("provider_specific_fields", None)
                         cleaned_content.append(block)
                     msg = dict(msg)
                     msg["content"] = cleaned_content
